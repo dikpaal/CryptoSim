@@ -188,12 +188,12 @@ func (orderBook *OrderBook) GetSnapshot(depth int) ([][2]float64, [][2]float64) 
 
 	for i := 0; i < orderBook.asks.Len() && i < depth; i++ {
 		order := (*orderBook.asks)[i]
-		bids = append(bids, [2]float64{order.Price, order.RemainingQty()})
+		asks = append(bids, [2]float64{order.Price, order.RemainingQty()})
 	}
 
-	for i := 0; i < orderBook.asks.Len() && i < depth; i++ {
-		order := (*orderBook.asks)[i]
-		asks = append(asks, [2]float64{order.Price, order.RemainingQty()})
+	for i := 0; i < orderBook.bids.Len() && i < depth; i++ {
+		order := (*orderBook.bids)[i]
+		bids = append(asks, [2]float64{order.Price, order.RemainingQty()})
 	}
 
 	return asks, bids
@@ -210,7 +210,7 @@ func (orderBook *OrderBook) removeOrderFromHeap(order *models.Order) {
 
 	for i := 0; i < h.Len(); i++ {
 		var o *models.Order
-		if o.Side == models.Ask {
+		if order.Side == models.Ask {
 			o = (*orderBook.asks)[i]
 		} else {
 			o = (*orderBook.bids)[i]

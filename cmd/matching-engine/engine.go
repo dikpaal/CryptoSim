@@ -1,10 +1,3 @@
-// r.Post("/orders", engine.handleSubmitOrder)
-// r.Delete("/orders/{id}", engine.handleCancelOrder)
-// r.Get("/orderbook", engine.handleGetOrderBook)
-// r.Get("/trades", engine.handleGetTrades)
-// r.Get("/orders/{id}", engine.handleGetOrder)
-// r.Get("/health", engine.handleHealth)
-
 package matchingengine
 
 import (
@@ -14,6 +7,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 )
+
+type Engine struct {
+	orderBook *OrderBook
+	trades    []*models.Trade
+	natsConn  *NATSConn
+}
+
+func NewEngine(symbol string) *Engine {
+	return &Engine{
+		orderBook: NewOrderBook(symbol),
+		trades:    make([]*models.Trade, 0, 1000),
+	}
+}
 
 type SubmitOrderRequest struct {
 	MMID      string  `json:"mm_id"`
@@ -34,7 +40,7 @@ type OrderBookResponse struct {
 	Asks [][2]float64 `json:"asks"`
 }
 
-func (engine *Engine) handleSubmitOrder(w http.ResponseWriter, r *http.Request) {
+func (engine *Engine) HandleSubmitOrder(w http.ResponseWriter, r *http.Request) {
 
 	var request SubmitOrderRequest
 
@@ -52,7 +58,7 @@ func (engine *Engine) handleSubmitOrder(w http.ResponseWriter, r *http.Request) 
 
 	orderType := models.Limit
 	if request.OrderType == "MARKET" {
-		side = models.Side(models.Market)
+		orderType = models.Market
 	}
 
 	order := models.NewOrder(request.MMID, request.Symbol, side, orderType, request.Price, request.Qty)
@@ -75,7 +81,7 @@ func (engine *Engine) handleSubmitOrder(w http.ResponseWriter, r *http.Request) 
 
 }
 
-func (engine *Engine) handleCancelOrder(w http.ResponseWriter, r *http.Request) {
+func (engine *Engine) HandleCancelOrder(w http.ResponseWriter, r *http.Request) {
 
 	orderID := chi.URLParam(r, "id")
 	success := engine.orderBook.CancelOrder(orderID)
@@ -89,7 +95,7 @@ func (engine *Engine) handleCancelOrder(w http.ResponseWriter, r *http.Request) 
 	json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
 }
 
-func (engine *Engine) handleGetOrderBook(w http.ResponseWriter, r *http.Request) {
+func (engine *Engine) HandleGetOrderBook(w http.ResponseWriter, r *http.Request) {
 	asks, bids := engine.orderBook.GetSnapshot(10)
 
 	response := OrderBookResponse{
@@ -101,7 +107,7 @@ func (engine *Engine) handleGetOrderBook(w http.ResponseWriter, r *http.Request)
 	json.NewEncoder(w).Encode(response)
 }
 
-func (engine *Engine) handleGetTrades(w http.ResponseWriter, r *http.Request) {
+func (engine *Engine) HandleGetTrades(w http.ResponseWriter, r *http.Request) {
 	start := len(engine.trades) - 100
 	if start < 0 {
 		start = 0
@@ -113,7 +119,7 @@ func (engine *Engine) handleGetTrades(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(recentTrades)
 }
 
-func (engine *Engine) handleGetOrder(w http.ResponseWriter, r *http.Request) {
+func (engine *Engine) HandleGetOrder(w http.ResponseWriter, r *http.Request) {
 	orderID := chi.URLParam(r, "id")
 
 	order, exists := engine.orderBook.GetOrder(orderID)
@@ -127,7 +133,7 @@ func (engine *Engine) handleGetOrder(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(order)
 }
 
-func (engine *Engine) handleHealth(w http.ResponseWriter, r *http.Request) {
+func (engine *Engine) HandleHealth(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})

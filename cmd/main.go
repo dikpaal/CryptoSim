@@ -1,6 +1,7 @@
-package matchingengine
+package main
 
 import (
+	matchingengine "cryptosim/cmd/matching-engine"
 	"log"
 	"net/http"
 	"os"
@@ -15,18 +16,18 @@ func main() {
 	symbol := getEnv("SYMBOL", "BTC-USD")
 	port := getEnv("PORT", "8080")
 
-	engine := NewEngine(symbol)
+	engine := matchingengine.NewEngine(symbol)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 
-	r.Post("/orders", engine.handleSubmitOrder)
-	r.Delete("/orders/{id}", engine.handleCancelOrder)
-	r.Get("/orderbook", engine.handleGetOrderBook)
-	r.Get("/trades", engine.handleGetTrades)
-	r.Get("/orders/{id}", engine.handleGetOrder)
-	r.Get("/health", engine.handleHealth)
+	r.Post("/orders", engine.HandleSubmitOrder)
+	r.Delete("/orders/{id}", engine.HandleCancelOrder)
+	r.Get("/orderbook", engine.HandleGetOrderBook)
+	r.Get("/trades", engine.HandleGetTrades)
+	r.Get("/orders/{id}", engine.HandleGetOrder)
+	r.Get("/health", engine.HandleHealth)
 
 	server := &http.Server{
 		Addr:    ":" + port,
