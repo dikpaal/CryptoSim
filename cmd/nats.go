@@ -1,9 +1,10 @@
-package matchingengine
+package main
 
 import (
 	"cryptosim/models"
 	"encoding/json"
 	"log"
+	"time"
 
 	"github.com/nats-io/nats.go"
 )
@@ -53,5 +54,19 @@ func (n *NATSConn) Close() {
 	if n.nc != nil {
 		n.nc.Close()
 		log.Println("NATS connection closed")
+	}
+}
+
+func startSnapshotPublisher(engine *Engine, interval time.Duration) {
+	ticker := time.NewTicker(interval)
+	defer ticker.Stop()
+
+	for range ticker.C {
+		if engine.natsConn != nil {
+			bids, asks := engine.orderBook.GetSnapshot(10)
+			if err := engine.natsConn.PublishOrderBookSnapshot(bids, asks); err != nil {
+				log.Printf("Error publishing snapshot: %v", err)
+			}
+		}
 	}
 }

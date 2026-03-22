@@ -1,4 +1,4 @@
-package matchingengine
+package main
 
 import (
 	"container/heap"
@@ -56,7 +56,7 @@ func (orderBook *OrderBook) matchMarketOrder(order *models.Order) []*models.Trad
 	}
 
 	for restingOrders.Len() > 0 && !order.IsFilled() {
-		bestRestingOrder := orderBook.peek(order.Side)
+		bestRestingOrder := orderBook.peekOpposite(order.Side)
 
 		if bestRestingOrder == nil {
 			break
@@ -87,7 +87,7 @@ func (orderBook *OrderBook) matchMarketOrder(order *models.Order) []*models.Trad
 		bestRestingOrder.Fill(filledQuantity)
 
 		if bestRestingOrder.IsFilled() {
-			orderBook.removeFromHeap(order.Side)
+			orderBook.removeFromHeap(bestRestingOrder.Side)
 			delete(orderBook.orders, bestRestingOrder.ID)
 		}
 
@@ -112,7 +112,7 @@ func (orderBook *OrderBook) matchLimitOrder(order *models.Order) []*models.Trade
 	}
 
 	for restingOrders.Len() > 0 && !order.IsFilled() {
-		restingOrder := orderBook.peek(order.Side)
+		restingOrder := orderBook.peekOpposite(order.Side)
 		if restingOrder == nil {
 			break
 		}
@@ -147,7 +147,7 @@ func (orderBook *OrderBook) matchLimitOrder(order *models.Order) []*models.Trade
 		restingOrder.Fill(fillQty)
 
 		if restingOrder.IsFilled() {
-			orderBook.removeFromHeap(order.Side)
+			orderBook.removeFromHeap(restingOrder.Side)
 			delete(orderBook.orders, restingOrder.ID)
 		}
 
@@ -188,12 +188,12 @@ func (orderBook *OrderBook) GetSnapshot(depth int) ([][2]float64, [][2]float64) 
 
 	for i := 0; i < orderBook.asks.Len() && i < depth; i++ {
 		order := (*orderBook.asks)[i]
-		asks = append(bids, [2]float64{order.Price, order.RemainingQty()})
+		asks = append(asks, [2]float64{order.Price, order.RemainingQty()})
 	}
 
 	for i := 0; i < orderBook.bids.Len() && i < depth; i++ {
 		order := (*orderBook.bids)[i]
-		bids = append(asks, [2]float64{order.Price, order.RemainingQty()})
+		bids = append(bids, [2]float64{order.Price, order.RemainingQty()})
 	}
 
 	return asks, bids
@@ -231,17 +231,20 @@ func (orderBook *OrderBook) removeFromHeap(side models.Side) {
 	}
 }
 
-func (orderBook *OrderBook) peek(side models.Side) *models.Order {
+func (orderBook *OrderBook) peekOpposite(side models.Side) *models.Order {
+
+	// peeks in the opposite heap
+
 	if side == models.Ask {
-		if orderBook.asks.Len() == 0 {
-			return nil
-		}
-		return (*orderBook.asks)[0]
-	} else {
 		if orderBook.bids.Len() == 0 {
 			return nil
 		}
 		return (*orderBook.bids)[0]
+	} else {
+		if orderBook.asks.Len() == 0 {
+			return nil
+		}
+		return (*orderBook.asks)[0]
 	}
 }
 

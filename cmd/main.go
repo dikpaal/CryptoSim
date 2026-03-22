@@ -1,12 +1,12 @@
 package main
 
 import (
-	matchingengine "cryptosim/cmd/matching-engine"
 	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -15,8 +15,20 @@ import (
 func main() {
 	symbol := getEnv("SYMBOL", "BTC-USD")
 	port := getEnv("PORT", "8080")
+	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
 
-	engine := matchingengine.NewEngine(symbol)
+	engine := NewEngine(symbol)
+
+	natsConn, err := NewNATSConn(natsURL)
+	if err != nil {
+		log.Printf("Warning: NATS connection failed: %v. Running without NATS.", err)
+	} else {
+		engine.natsConn = natsConn
+		defer natsConn.Close()
+		log.Println("Connected to NATS")
+
+		go startSnapshotPublisher(engine, 100*time.Millisecond)
+	}
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)

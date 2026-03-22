@@ -1,4 +1,4 @@
-package matchingengine
+package main
 
 import (
 	"cryptosim/models"
