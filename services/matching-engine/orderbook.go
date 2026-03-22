@@ -168,6 +168,43 @@ func (orderBook *OrderBook) addToBook(order *models.Order) {
 	}
 }
 
+func (orderBook *OrderBook) CancelOrder(orderID string) bool {
+	order, exists := orderBook.orders[orderID]
+	if !exists {
+		return false
+	}
+
+	order.Status = models.Cancelled
+	delete(orderBook.orders, order.ID)
+
+	orderBook.removeOrderFromHeap(order)
+	return true
+
+}
+
+func (orderBook *OrderBook) removeOrderFromHeap(order *models.Order) {
+	var h heap.Interface
+	if order.Side == models.Ask {
+		h = orderBook.asks
+	} else {
+		h = orderBook.bids
+	}
+
+	for i := 0; i < h.Len(); i++ {
+		var o *models.Order
+		if o.Side == models.Ask {
+			o = (*orderBook.asks)[i]
+		} else {
+			o = (*orderBook.bids)[i]
+		}
+
+		if o.ID == order.ID {
+			heap.Remove(h, i)
+			break
+		}
+	}
+}
+
 func (orderBook *OrderBook) removeFromHeap(side models.Side) {
 	if side == models.Ask {
 		heap.Pop(orderBook.asks)
