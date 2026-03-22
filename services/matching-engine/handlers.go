@@ -29,6 +29,11 @@ type SubmitOrderResponse struct {
 	Status  string `json:"status"`
 }
 
+type OrderBookResponse struct {
+	Bids [][2]float64 `json:"bids"`
+	Asks [][2]float64 `json:"asks"`
+}
+
 func (engine *Engine) handleSubmitOrder(w http.ResponseWriter, r *http.Request) {
 
 	var request SubmitOrderRequest
@@ -82,4 +87,48 @@ func (engine *Engine) handleCancelOrder(w http.ResponseWriter, r *http.Request) 
 
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
+}
+
+func (engine *Engine) handleGetOrderBook(w http.ResponseWriter, r *http.Request) {
+	asks, bids := engine.orderBook.GetSnapshot(10)
+
+	response := OrderBookResponse{
+		Bids: bids,
+		Asks: asks,
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+}
+
+func (engine *Engine) handleGetTrades(w http.ResponseWriter, r *http.Request) {
+	start := len(engine.trades) - 100
+	if start < 0 {
+		start = 0
+	}
+
+	recentTrades := engine.trades[start:]
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(recentTrades)
+}
+
+func (engine *Engine) handleGetOrder(w http.ResponseWriter, r *http.Request) {
+	orderID := chi.URLParam(r, "id")
+
+	order, exists := engine.orderBook.GetOrder(orderID)
+
+	if !exists {
+		http.Error(w, "Order not found", http.StatusNotFound)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(order)
+}
+
+func (engine *Engine) handleHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusOK)
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }

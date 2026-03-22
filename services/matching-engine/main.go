@@ -18,10 +18,10 @@ func main() {
 
 	r.Post("/orders", engine.handleSubmitOrder)
 	r.Delete("/orders/{id}", engine.handleCancelOrder)
-	// r.Get("/orderbook", engine.handleGetOrderBook)
-	// r.Get("/trades", engine.handleGetTrades)
-	// r.Get("/orders/{id}", engine.handleGetOrder)
-	// r.Get("/health", engine.handleHealth)
+	r.Get("/orderbook", engine.handleGetOrderBook)
+	r.Get("/trades", engine.handleGetTrades)
+	r.Get("/orders/{id}", engine.handleGetOrder)
+	r.Get("/health", engine.handleHealth)
 }
 
 func getEnv(key, defaultVal string) string {
