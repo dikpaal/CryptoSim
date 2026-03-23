@@ -3,6 +3,9 @@ package models
 type Side string
 type OrderType string
 type OrderStatus string
+type WSRequestType string
+type ProductId string
+type Channel string
 
 // BID | ASK
 const (
@@ -22,4 +25,18 @@ const (
 	Partial   OrderStatus = "PARTIAL"
 	Filled    OrderStatus = "FILLED"
 	Cancelled OrderStatus = "CANCELLED"
+)
+
+// SUBSCRIBE | UNSUBSCRIBE
+const (
+	Subscribe   WSRequestType = "subscribe"
+	Unsubscribe WSRequestType = "unsubscribe"
+)
+
+const (
+	BTC_USD ProductId = "BTC-USD"
+)
+
+const (
+	Ticker Channel = "ticker"
 )
