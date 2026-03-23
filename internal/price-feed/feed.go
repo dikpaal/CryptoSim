@@ -1,7 +1,6 @@
 package pricefeed
 
 import (
-	main "cryptosim/cmd"
 	"cryptosim/models"
 	"fmt"
 	"net/http"
@@ -48,7 +47,7 @@ type Ticker struct {
 
 type PriceFeedService struct {
 	wsConn   *websocket.Conn
-	natsConn *main.NATSConn
+	natsConn *NATSConn
 }
 
 func (priceFeedService *PriceFeedService) dial(endpoint string) (*websocket.Conn, *http.Response, error) {
