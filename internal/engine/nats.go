@@ -1,7 +1,6 @@
 package engine
 
 import (
-	pricefeed "cryptosim/internal/price-feed"
 	"cryptosim/models"
 	"encoding/json"
 	"log"
@@ -56,16 +55,6 @@ func (n *NATSConn) Close() {
 		n.nc.Close()
 		log.Println("NATS connection closed")
 	}
-}
-
-func (n *NATSConn) SubscribeToPriceFeedTopic(handler func(pricefeed.PriceData)) error {
-	_, err := n.nc.Subscribe(pricefeed.PricesLiveTopic, func(msg *nats.Msg) {
-		var priceData pricefeed.PriceData
-		json.Unmarshal(msg.Data, &priceData)
-		handler(priceData)
-	})
-
-	return err
 }
 
 func startSnapshotPublisher(engine *Engine, interval time.Duration) {
