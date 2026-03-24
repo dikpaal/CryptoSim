@@ -1,7 +1,7 @@
 package engine
 
 import (
-	"cryptosim/models"
+	"cryptosim/internal/models"
 	"testing"
 )
 

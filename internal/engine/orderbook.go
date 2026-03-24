@@ -2,7 +2,7 @@ package engine
 
 import (
 	"container/heap"
-	"cryptosim/models"
+	"cryptosim/internal/models"
 )
 
 type OrderBook struct {

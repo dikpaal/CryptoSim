@@ -1,7 +1,7 @@
 package pricefeed
 
 import (
-	"cryptosim/models"
+	"cryptosim/internal/models"
 	"encoding/json"
 	"fmt"
 	"net/http"
