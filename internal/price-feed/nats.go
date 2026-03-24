@@ -1,9 +1,7 @@
 package pricefeed
 
 import (
-	"cryptosim/models"
 	"log"
-	"time"
 
 	"github.com/nats-io/nats.go"
 )
@@ -30,10 +28,4 @@ func (n *NATSConn) Close() {
 		n.nc.Close()
 		log.Println("NATS connection closed")
 	}
-}
-
-func (n *NATSConn) PublishLivePrices(trade *models.Trade) error {
-}
-
-func startLivePricesPublisher(engine *Engine, interval time.Duration) {
 }

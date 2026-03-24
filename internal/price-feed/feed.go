@@ -2,8 +2,10 @@ package pricefeed
 
 import (
 	"cryptosim/models"
+	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"github.com/gorilla/websocket"
 )
@@ -45,6 +47,13 @@ type Ticker struct {
 	BestAskQuantity    string `json:"best_ask_quantity"`
 }
 
+type PriceData struct {
+	Symbol    string  `json:"symbol"`
+	Bid       float64 `json:"bid"`
+	Ask       float64 `json:"ask"`
+	Timestamp string  `json:"timestamp"`
+}
+
 type PriceFeedService struct {
 	wsConn   *websocket.Conn
 	natsConn *NATSConn
@@ -78,14 +87,49 @@ func (priceFeedService *PriceFeedService) subscribe(conn *websocket.Conn, reques
 	}
 }
 
-func (priceFeedService *PriceFeedService) ReadMessages() {
-	for {
-		var tickerResponse TickerResponse
-		err := priceFeedService.wsConn.ReadJSON(&tickerResponse)
-		if err != nil {
-			fmt.Println("Read error:", err)
-			break
+func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceData {
+
+	priceDataChannel := make(chan PriceData)
+
+	go func() {
+		defer close(priceDataChannel)
+
+		for {
+			var tickerResponse TickerResponse
+			err := priceFeedService.wsConn.ReadJSON(&tickerResponse)
+			if err != nil {
+				fmt.Println("PRICE FEED JSON read error:", err)
+				break
+			}
+
+			bid, err := strconv.ParseFloat(tickerResponse.Events[0].Tickers[0].BestBid, 64)
+			if err != nil {
+				fmt.Println("ERROR IN READING BID")
+			}
+			ask, err := strconv.ParseFloat(tickerResponse.Events[0].Tickers[0].BestAsk, 64)
+			if err != nil {
+				fmt.Println("ERROR IN READING ASK")
+			}
+
+			priceData := PriceData{
+				Symbol:    tickerResponse.Events[0].Tickers[0].ProductID,
+				Bid:       bid,
+				Ask:       ask,
+				Timestamp: tickerResponse.Timestamp,
+			}
+
+			priceDataChannel <- priceData
 		}
-		fmt.Printf("Ticker: %+v\n", tickerResponse)
+	}()
+
+	return priceDataChannel
+}
+
+func (priceFeedService *PriceFeedService) startLivePricesPublisher() {
+	readChannel := priceFeedService.ReadMessages()
+
+	for priceData := range readChannel {
+		data, _ := json.Marshal(priceData)
+		priceFeedService.natsConn.nc.Publish(PricesLiveTopic, data)
 	}
 }
