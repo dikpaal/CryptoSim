@@ -4,8 +4,11 @@ import (
 	"cryptosim/internal/models"
 	"encoding/json"
 	"fmt"
+	"log"
+	"math"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gorilla/websocket"
 )
@@ -87,6 +90,24 @@ func (priceFeedService *PriceFeedService) subscribe(conn *websocket.Conn, reques
 	}
 }
 
+func (priceFeedService *PriceFeedService) ReconnectWithExponentialBackoff(numTries int) {
+
+	priceFeedService.wsConn.Close()
+
+	for count := 1; count <= numTries; count++ {
+		backoffDelay := time.Duration(math.Pow(2, float64(count))) * time.Second
+		fmt.Println("CONNECTION FAILED.. RECONNECT ATTEMPT ", count, " BACKOFF DELAY: ", backoffDelay)
+		time.Sleep(backoffDelay)
+
+		conn, _, err := priceFeedService.dial(endpoint)
+		if err == nil {
+			priceFeedService.wsConn = conn
+			priceFeedService.subscribe(conn, "subscribe", []models.ProductId{models.BTC_USD}, models.Ticker)
+		}
+	}
+	log.Fatalln("Could not reconnect, stopping the sim!")
+}
+
 func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceData {
 
 	priceDataChannel := make(chan PriceData)
@@ -98,8 +119,9 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceData {
 			var tickerResponse TickerResponse
 			err := priceFeedService.wsConn.ReadJSON(&tickerResponse)
 			if err != nil {
-				fmt.Println("PRICE FEED JSON read error:", err)
-				break
+				fmt.Println("PRICE FEED JSON read error. RECONNECTING:", err)
+				priceFeedService.ReconnectWithExponentialBackoff(3)
+				continue
 			}
 
 			bid, err := strconv.ParseFloat(tickerResponse.Events[0].Tickers[0].BestBid, 64)
