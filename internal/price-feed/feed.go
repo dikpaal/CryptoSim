@@ -54,6 +54,7 @@ type PriceData struct {
 	Symbol    string  `json:"symbol"`
 	Bid       float64 `json:"bid"`
 	Ask       float64 `json:"ask"`
+	Mid       float64 `json:"mid"`
 	Timestamp string  `json:"timestamp"`
 }
 
@@ -137,6 +138,7 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceData {
 				Symbol:    tickerResponse.Events[0].Tickers[0].ProductID,
 				Bid:       bid,
 				Ask:       ask,
+				Mid:       (bid + ask) / 2,
 				Timestamp: tickerResponse.Timestamp,
 			}
 
