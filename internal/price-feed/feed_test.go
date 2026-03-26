@@ -63,10 +63,10 @@ func TestPriceFeedPublishing(t *testing.T) {
 	}
 	defer natsConn.Close()
 
-	received := make(chan PriceData, 1)
+	received := make(chan PriceTick, 1)
 
 	_, err = natsConn.Subscribe(PricesLiveTopic, func(msg *nats.Msg) {
-		var pd PriceData
+		var pd PriceTick
 		json.Unmarshal(msg.Data, &pd)
 		received <- pd
 	})
@@ -98,17 +98,17 @@ func TestPriceFeedPublishing(t *testing.T) {
 
 	// Step 4: Wait for message and assert
 	select {
-	case priceData := <-received:
-		if priceData.Symbol != "BTC-USD" {
-			t.Errorf("Expected symbol BTC-USD, got %s", priceData.Symbol)
+	case priceTick := <-received:
+		if priceTick.Symbol != "BTC-USD" {
+			t.Errorf("Expected symbol BTC-USD, got %s", priceTick.Symbol)
 		}
-		if priceData.Bid != 50000.00 {
-			t.Errorf("Expected bid 50000.00, got %f", priceData.Bid)
+		if priceTick.Bid != 50000.00 {
+			t.Errorf("Expected bid 50000.00, got %f", priceTick.Bid)
 		}
-		if priceData.Ask != 50001.00 {
-			t.Errorf("Expected ask 50001.00, got %f", priceData.Ask)
+		if priceTick.Ask != 50001.00 {
+			t.Errorf("Expected ask 50001.00, got %f", priceTick.Ask)
 		}
-		t.Logf("Successfully received price data: %+v", priceData)
+		t.Logf("Successfully received price data: %+v", priceTick)
 	case <-time.After(2 * time.Second):
 		t.Fatal("Timeout waiting for price data on NATS")
 	}

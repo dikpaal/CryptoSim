@@ -50,7 +50,7 @@ type Ticker struct {
 	BestAskQuantity    string `json:"best_ask_quantity"`
 }
 
-type PriceData struct {
+type PriceTick struct {
 	Symbol    string  `json:"symbol"`
 	Bid       float64 `json:"bid"`
 	Ask       float64 `json:"ask"`
@@ -109,12 +109,12 @@ func (priceFeedService *PriceFeedService) ReconnectWithExponentialBackoff(numTri
 	log.Fatalln("Could not reconnect, stopping the sim!")
 }
 
-func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceData {
+func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
 
-	priceDataChannel := make(chan PriceData)
+	priceTickChannel := make(chan PriceTick)
 
 	go func() {
-		defer close(priceDataChannel)
+		defer close(priceTickChannel)
 
 		for {
 			var tickerResponse TickerResponse
@@ -134,7 +134,7 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceData {
 				fmt.Println("ERROR IN READING ASK")
 			}
 
-			priceData := PriceData{
+			priceTick := PriceTick{
 				Symbol:    tickerResponse.Events[0].Tickers[0].ProductID,
 				Bid:       bid,
 				Ask:       ask,
@@ -142,18 +142,18 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceData {
 				Timestamp: tickerResponse.Timestamp,
 			}
 
-			priceDataChannel <- priceData
+			priceTickChannel <- priceTick
 		}
 	}()
 
-	return priceDataChannel
+	return priceTickChannel
 }
 
 func (priceFeedService *PriceFeedService) startLivePricesPublisher() {
 	readChannel := priceFeedService.ReadMessages()
 
-	for priceData := range readChannel {
-		data, _ := json.Marshal(priceData)
+	for priceTick := range readChannel {
+		data, _ := json.Marshal(priceTick)
 		priceFeedService.natsConn.nc.Publish(PricesLiveTopic, data)
 	}
 }
