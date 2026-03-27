@@ -13,7 +13,7 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-type PersistenceService struct {
+type TradesHandler struct {
 	n              *NATSConn
 	tradeChan      chan models.Trade
 	batchBuffer    []models.Trade
@@ -22,14 +22,14 @@ type PersistenceService struct {
 	mu             sync.Mutex
 }
 
-func NewPersistenceService(url string, db *pgxpool.Pool) (*PersistenceService, error) {
+func NewTradesHandler(url string, db *pgxpool.Pool) (*TradesHandler, error) {
 
 	n, err := NewNATSConn(url)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PersistenceService{
+	return &TradesHandler{
 		n:              n,
 		tradeChan:      make(chan models.Trade, 1000),
 		batchBuffer:    make([]models.Trade, 0, 100),
@@ -38,77 +38,77 @@ func NewPersistenceService(url string, db *pgxpool.Pool) (*PersistenceService, e
 	}, nil
 }
 
-func (persistenceService *PersistenceService) SubscribeTradesExecuted() {
-	go persistenceService.worker(persistenceService.tradeChan) // start once, not per message
+func (tradesHandler *TradesHandler) SubscribeTradesExecuted() {
+	go tradesHandler.worker(tradesHandler.tradeChan) // start once, not per message
 
-	persistenceService.n.nc.Subscribe(TradesExecutedTopic, func(m *nats.Msg) {
+	tradesHandler.n.nc.Subscribe(TradesExecutedTopic, func(m *nats.Msg) {
 		var trade models.Trade
 		json.Unmarshal(m.Data, &trade)
-		persistenceService.tradeChan <- trade // just send
+		tradesHandler.tradeChan <- trade // just send
 	})
 }
 
-func (persistenceService *PersistenceService) worker(buffer <-chan models.Trade) {
+func (tradesHandler *TradesHandler) worker(buffer <-chan models.Trade) {
 	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case trade := <-buffer:
-			persistenceService.mu.Lock()
-			persistenceService.batchBuffer = append(persistenceService.batchBuffer, trade)
-			shouldFlush := len(persistenceService.batchBuffer) >= 100
-			persistenceService.mu.Unlock()
+			tradesHandler.mu.Lock()
+			tradesHandler.batchBuffer = append(tradesHandler.batchBuffer, trade)
+			shouldFlush := len(tradesHandler.batchBuffer) >= 100
+			tradesHandler.mu.Unlock()
 
 			if shouldFlush {
-				persistenceService.FlushAll()
+				tradesHandler.FlushAll()
 			}
 
 		case <-ticker.C:
-			persistenceService.FlushAll()
+			tradesHandler.FlushAll()
 		}
 	}
 }
 
-func (persistenceService *PersistenceService) FlushAll() {
-	persistenceService.mu.Lock()
-	if len(persistenceService.batchBuffer) == 0 {
-		persistenceService.mu.Unlock()
+func (tradesHandler *TradesHandler) FlushAll() {
+	tradesHandler.mu.Lock()
+	if len(tradesHandler.batchBuffer) == 0 {
+		tradesHandler.mu.Unlock()
 		return
 	}
 
-	trades := make([]models.Trade, len(persistenceService.batchBuffer))
-	copy(trades, persistenceService.batchBuffer)
-	persistenceService.batchBuffer = persistenceService.batchBuffer[:0] // clear, keep capacity
-	persistenceService.mu.Unlock()
+	trades := make([]models.Trade, len(tradesHandler.batchBuffer))
+	copy(trades, tradesHandler.batchBuffer)
+	tradesHandler.batchBuffer = tradesHandler.batchBuffer[:0] // clear, keep capacity
+	tradesHandler.mu.Unlock()
 
 	// Try to write to DB
-	err := persistenceService.writeTradesToDB(trades)
+	err := tradesHandler.writeTradesToDB(trades)
 	if err != nil {
 		log.Printf("DB write failed, adding to circular buffer: %v", err)
 		for _, trade := range trades {
-			persistenceService.circularBuffer.Add(trade)
+			tradesHandler.circularBuffer.Add(trade)
 		}
 		return
 	}
 
 	// If DB is back up and circular buffer has data, flush!!!!!!
-	if persistenceService.circularBuffer.Len() > 0 {
-		bufferedTrades := persistenceService.circularBuffer.FlushAll()
-		if err := persistenceService.writeTradesToDB(bufferedTrades); err != nil {
+	if tradesHandler.circularBuffer.Len() > 0 {
+		bufferedTrades := tradesHandler.circularBuffer.FlushAll()
+		if err := tradesHandler.writeTradesToDB(bufferedTrades); err != nil {
 			log.Printf("Failed to flush circular buffer: %v", err)
 			// Put them back in circular buffer
 			for _, trade := range bufferedTrades {
-				persistenceService.circularBuffer.Add(trade)
+				tradesHandler.circularBuffer.Add(trade)
 			}
 		}
 	}
 }
 
-func (persistenceService *PersistenceService) writeTradesToDB(trades []models.Trade) error {
+func (tradesHandler *TradesHandler) writeTradesToDB(trades []models.Trade) error {
 	ctx := context.Background()
 
-	_, err := persistenceService.db.CopyFrom(
+	_, err := tradesHandler.db.CopyFrom(
 		ctx,
 		pgx.Identifier{"trades"},
 		[]string{"trade_id", "symbol", "price", "qty", "buyer_mm_id", "seller_mm_id", "buyer_order_id",
