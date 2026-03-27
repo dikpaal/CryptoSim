@@ -31,9 +31,9 @@ func NewTradesHandler(url string, db *pgxpool.Pool) (*TradesHandler, error) {
 
 	return &TradesHandler{
 		n:              n,
-		tradeChan:      make(chan models.Trade, 1000),
-		batchBuffer:    make([]models.Trade, 0, 100),
-		circularBuffer: models.NewCircularBuffer(10000),
+		tradeChan:      make(chan models.Trade, 5000),
+		batchBuffer:    make([]models.Trade, 0, 2500),
+		circularBuffer: models.NewCircularBuffer(15000),
 		db:             db,
 	}, nil
 }

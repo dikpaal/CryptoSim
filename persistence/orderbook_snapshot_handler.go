@@ -31,9 +31,9 @@ func NewOrderbookSnapshotHandler(url string, db *pgxpool.Pool) (*OrderbookSnapsh
 
 	return &OrderbookSnapshotHandler{
 		n:              n,
-		snapshotChan:   make(chan models.OrderbookSnapshot, 1000),
-		batchBuffer:    make([]models.OrderbookSnapshot, 0, 100),
-		circularBuffer: models.NewCircularBufferSnapshot(10000),
+		snapshotChan:   make(chan models.OrderbookSnapshot, 10),
+		batchBuffer:    make([]models.OrderbookSnapshot, 0, 5),
+		circularBuffer: models.NewCircularBufferSnapshot(20),
 		db:             db,
 	}, nil
 }
