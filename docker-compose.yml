@@ -8,15 +8,47 @@ services:
       - "8222:8222"
     command: "-js"
 
+  # Using existing TimescaleDB on host port 6543
+  # timescaledb:
+  #   image: timescale/timescaledb:latest-pg16
+  #   ports:
+  #     - "6543:5432"
+  #   environment:
+  #     - POSTGRES_DB=cryptosim
+  #     - POSTGRES_USER=postgres
+  #     - POSTGRES_PASSWORD=postgres
+  #   volumes:
+  #     - timescale_data:/var/lib/postgresql/data
+  #     - ./migrations:/docker-entrypoint-initdb.d
+
   matching-engine:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8080:8080"
+      - "8081:8080"
     environment:
       - SYMBOL=BTC-USD
       - PORT=8080
       - NATS_URL=nats://nats:4222
     depends_on:
       - nats
+
+  persistence:
+    build:
+      context: .
+      dockerfile: persistence/Dockerfile
+    environment:
+      - NATS_URL=nats://nats:4222
+      - DB_HOST=host.docker.internal
+      - DB_PORT=6543
+      - DB_NAME=cryptosim
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+    depends_on:
+      - nats
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  timescale_data:

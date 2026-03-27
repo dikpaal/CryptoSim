@@ -12,7 +12,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 )
 
-func main() {
+func Main() {
 	symbol := getEnv("SYMBOL", "BTC-USD")
 	port := getEnv("PORT", "8080")
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
