@@ -36,10 +36,11 @@ func (n *NATSConn) PublishTrade(trade *models.Trade) error {
 	return n.nc.Publish(TradesExecutedTopic, data)
 }
 
-func (n *NATSConn) PublishOrderBookSnapshot(bids, asks [][2]float64) error {
+func (n *NATSConn) PublishOrderBookSnapshot(symbol string, bids, asks [][2]float64) error {
 	snapshot := map[string]interface{}{
-		"bids": bids,
-		"asks": asks,
+		"symbol": symbol,
+		"bids":   bids,
+		"asks":   asks,
 	}
 
 	data, err := json.Marshal(snapshot)
@@ -64,7 +65,7 @@ func startSnapshotPublisher(engine *Engine, interval time.Duration) {
 	for range ticker.C {
 		if engine.natsConn != nil {
 			bids, asks := engine.orderBook.GetSnapshot(10)
-			if err := engine.natsConn.PublishOrderBookSnapshot(bids, asks); err != nil {
+			if err := engine.natsConn.PublishOrderBookSnapshot(engine.orderBook.symbol, bids, asks); err != nil {
 				log.Printf("Error publishing snapshot: %v", err)
 			}
 		}
