@@ -21,6 +21,16 @@ services:
   #     - timescale_data:/var/lib/postgresql/data
   #     - ./migrations:/docker-entrypoint-initdb.d
 
+  price-feed:
+    build:
+      context: .
+      dockerfile: price-feed.Dockerfile
+    environment:
+      - SYMBOL=BTC-USD
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+
   matching-engine:
     build:
       context: .
@@ -33,6 +43,7 @@ services:
       - NATS_URL=nats://nats:4222
     depends_on:
       - nats
+      - price-feed
 
   persistence:
     build:
@@ -49,6 +60,73 @@ services:
       - nats
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  trader:
+    build:
+      context: .
+      dockerfile: trader.Dockerfile
+    environment:
+      - TRADER_ID=trader-1
+      - SYMBOL=BTC-USD
+      - NATS_URL=nats://nats:4222
+      - ORDERS_PER_SEC=100
+      - MARKET_ORDER_RATIO=0.3
+      - BUY_RATIO=0.5
+      - MIN_QTY=0.01
+      - MAX_QTY=0.1
+      - AGGRESSIVE_LIMIT_BPS=5.0
+      - MAX_IN_FLIGHT=100
+      - REQUEST_TIMEOUT_MS=250
+      - MATCH_FRIENDLY=true
+      - P_HIT_MM=0.6
+    depends_on:
+      - nats
+      - matching-engine
+
+  mm-scalper:
+    build:
+      context: .
+      dockerfile: mm.Dockerfile
+      args:
+        - MM_TYPE=mm-scalper
+    environment:
+      - MM_ID=mm-scalper
+      - SYMBOL=BTC-USD
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+      - price-feed
+      - matching-engine
+
+  mm-momentum:
+    build:
+      context: .
+      dockerfile: mm.Dockerfile
+      args:
+        - MM_TYPE=mm-momentum
+    environment:
+      - MM_ID=mm-momentum
+      - SYMBOL=BTC-USD
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+      - price-feed
+      - matching-engine
+
+  mm-avstoikov:
+    build:
+      context: .
+      dockerfile: mm.Dockerfile
+      args:
+        - MM_TYPE=mm-avstoikov
+    environment:
+      - MM_ID=mm-avstoikov
+      - SYMBOL=BTC-USD
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      - nats
+      - price-feed
+      - matching-engine
 
 volumes:
   timescale_data:
