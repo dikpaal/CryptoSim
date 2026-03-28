@@ -55,12 +55,39 @@ type PriceTick struct {
 	Bid       float64 `json:"bid"`
 	Ask       float64 `json:"ask"`
 	Mid       float64 `json:"mid"`
-	Timestamp string  `json:"timestamp"`
+	Timestamp int64   `json:"timestamp"`
 }
 
 type PriceFeedService struct {
 	wsConn   *websocket.Conn
 	natsConn *NATSConn
+	symbol   string
+}
+
+func NewPriceFeedService(natsConn *NATSConn, symbol string) *PriceFeedService {
+	return &PriceFeedService{
+		natsConn: natsConn,
+		symbol:   symbol,
+	}
+}
+
+func (pfs *PriceFeedService) Start() error {
+	// Connect to Coinbase WebSocket
+	conn, _, err := pfs.dial("wss://advanced-trade-ws.coinbase.com")
+	if err != nil {
+		return fmt.Errorf("failed to connect to Coinbase: %w", err)
+	}
+	pfs.wsConn = conn
+	log.Println("Connected to Coinbase WebSocket")
+
+	// Subscribe to ticker channel
+	productID := models.ProductId(pfs.symbol)
+	pfs.subscribe(conn, "subscribe", []models.ProductId{productID}, models.Ticker)
+	log.Printf("Subscribed to ticker for %s", pfs.symbol)
+
+	// Start publishing prices to NATS
+	go pfs.startLivePricesPublisher()
+	return nil
 }
 
 func (priceFeedService *PriceFeedService) dial(endpoint string) (*websocket.Conn, *http.Response, error) {
@@ -125,21 +152,30 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
 				continue
 			}
 
-			bid, err := strconv.ParseFloat(tickerResponse.Events[0].Tickers[0].BestBid, 64)
-			if err != nil {
-				fmt.Println("ERROR IN READING BID")
+			// Skip empty events or subscription confirmations
+			if len(tickerResponse.Events) == 0 || len(tickerResponse.Events[0].Tickers) == 0 {
+				continue
 			}
-			ask, err := strconv.ParseFloat(tickerResponse.Events[0].Tickers[0].BestAsk, 64)
+
+			ticker := tickerResponse.Events[0].Tickers[0]
+
+			bid, err := strconv.ParseFloat(ticker.BestBid, 64)
 			if err != nil {
-				fmt.Println("ERROR IN READING ASK")
+				fmt.Println("ERROR IN READING BID:", err)
+				continue
+			}
+			ask, err := strconv.ParseFloat(ticker.BestAsk, 64)
+			if err != nil {
+				fmt.Println("ERROR IN READING ASK:", err)
+				continue
 			}
 
 			priceTick := PriceTick{
-				Symbol:    tickerResponse.Events[0].Tickers[0].ProductID,
+				Symbol:    ticker.ProductID,
 				Bid:       bid,
 				Ask:       ask,
 				Mid:       (bid + ask) / 2,
-				Timestamp: tickerResponse.Timestamp,
+				Timestamp: time.Now().Unix(),
 			}
 
 			priceTickChannel <- priceTick
