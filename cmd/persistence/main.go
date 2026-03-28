@@ -19,7 +19,7 @@ func main() {
 	dbPort := getEnv("DB_PORT", "5432")
 	dbName := getEnv("DB_NAME", "cryptosim")
 	dbUser := getEnv("DB_USER", "postgres")
-	dbPassword := getEnv("DB_PASSWORD", "postgres")
+	dbPassword := getEnv("DB_PASSWORD", "password")
 
 	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
 
