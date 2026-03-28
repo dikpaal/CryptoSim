@@ -27,6 +27,10 @@ func Main() {
 		defer natsConn.Close()
 		log.Println("Connected to NATS")
 
+		if err := natsConn.StartRequestReplyHandlers(engine); err != nil {
+			log.Fatalf("Failed to start NATS request-reply handlers: %v", err)
+		}
+
 		go startSnapshotPublisher(engine, 100*time.Millisecond)
 	}
 
