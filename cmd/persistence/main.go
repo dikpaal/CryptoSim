@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"cryptosim/persistence"
 
@@ -21,9 +22,21 @@ func main() {
 	dbUser := getEnv("DB_USER", "postgres")
 	dbPassword := getEnv("DB_PASSWORD", "password")
 
-	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s", dbUser, dbPassword, dbHost, dbPort, dbName)
+	connStr := fmt.Sprintf("postgres://%s:%s@%s:%s/%s?sslmode=disable", dbUser, dbPassword, dbHost, dbPort, dbName)
 
-	db, err := pgxpool.New(context.Background(), connStr)
+	// Configure pool for high throughput - benchmark shows 57k writes/s possible
+	poolConfig, err := pgxpool.ParseConfig(connStr)
+	if err != nil {
+		log.Fatalf("Failed to parse config: %v", err)
+	}
+
+	poolConfig.MaxConns = 20 // More connections for parallel writes
+	poolConfig.MinConns = 10 // Keep warm connections
+	poolConfig.MaxConnLifetime = 1 * time.Hour
+	poolConfig.MaxConnIdleTime = 30 * time.Minute
+	poolConfig.HealthCheckPeriod = 1 * time.Minute
+
+	db, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
 		log.Fatalf("Failed to connect to DB: %v", err)
 	}
