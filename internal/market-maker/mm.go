@@ -15,8 +15,8 @@ import (
 const (
 	PricesLiveTopic     = "prices.live"
 	TradesExecutedTopic = "trades.executed"
-	OrdersSubmitSubject = "orders.submit"
-	OrdersCancelSubject = "orders.cancel"
+	OrdersSubmitTopic   = "orders.submit"
+	OrdersCancelTopic   = "orders.cancel"
 	MMStatusTopic       = "mm.status"
 )
 
@@ -185,7 +185,7 @@ func (mm *MarketMaker) submitOrder(side, orderType string, price, qty float64) {
 		return
 	}
 
-	msg, err := mm.nc.Request(OrdersSubmitSubject, reqData, 250*time.Millisecond)
+	msg, err := mm.nc.Request(OrdersSubmitTopic, reqData, 250*time.Millisecond)
 	if err != nil {
 		return
 	}
@@ -230,7 +230,7 @@ func (mm *MarketMaker) cancelOrder(orderID string) {
 		return
 	}
 
-	mm.nc.Request(OrdersCancelSubject, reqData, 250*time.Millisecond)
+	mm.nc.Request(OrdersCancelTopic, reqData, 250*time.Millisecond)
 
 	mm.mu.Lock()
 	delete(mm.activeOrders, orderID)

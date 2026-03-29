@@ -12,8 +12,8 @@ import (
 const (
 	TradesExecutedTopic    = "trades.executed"
 	OrderBookSnapshotTopic = "orderbook.snapshot"
-	OrdersSubmitSubject    = "orders.submit"
-	OrdersCancelSubject    = "orders.cancel"
+	OrdersSubmitTopic      = "orders.submit"
+	OrdersCancelTopic      = "orders.cancel"
 )
 
 type NATSConn struct {
@@ -113,7 +113,7 @@ type OrderCancelReply struct {
 // subscribes to orders.submit and orders.cancel
 func (n *NATSConn) StartRequestReplyHandlers(engine *Engine) error {
 	// orders.submit
-	_, err := n.nc.QueueSubscribe(OrdersSubmitSubject, "engine", func(msg *nats.Msg) {
+	_, err := n.nc.QueueSubscribe(OrdersSubmitTopic, "engine", func(msg *nats.Msg) {
 		var req OrderSubmitRequest
 		if err := json.Unmarshal(msg.Data, &req); err != nil {
 			log.Printf("Error unmarshaling submit request: %v", err)
@@ -160,7 +160,7 @@ func (n *NATSConn) StartRequestReplyHandlers(engine *Engine) error {
 	log.Println("Subscribed to orders.submit")
 
 	// orders.cancel
-	_, err = n.nc.QueueSubscribe(OrdersCancelSubject, "engine", func(msg *nats.Msg) {
+	_, err = n.nc.QueueSubscribe(OrdersCancelTopic, "engine", func(msg *nats.Msg) {
 		var req OrderCancelRequest
 		if err := json.Unmarshal(msg.Data, &req); err != nil {
 			log.Printf("Error unmarshaling cancel request: %v", err)
