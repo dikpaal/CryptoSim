@@ -65,7 +65,7 @@ func TestPriceFeedPublishing(t *testing.T) {
 
 	received := make(chan PriceTick, 1)
 
-	_, err = natsConn.Subscribe(PricesLiveTopic, func(msg *nats.Msg) {
+	_, err = natsConn.Subscribe(models.PricesLiveTopic, func(msg *nats.Msg) {
 		var pd PriceTick
 		json.Unmarshal(msg.Data, &pd)
 		received <- pd

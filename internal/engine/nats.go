@@ -9,11 +9,6 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const (
-	TradesExecutedTopic    = "trades.executed"
-	OrderBookSnapshotTopic = "orderbook.snapshot"
-)
-
 type NATSConn struct {
 	nc *nats.Conn
 }
@@ -33,7 +28,7 @@ func (n *NATSConn) PublishTrade(trade *models.Trade) error {
 		return err
 	}
 
-	return n.nc.Publish(TradesExecutedTopic, data)
+	return n.nc.Publish(models.TradesExecutedTopic, data)
 }
 
 func (n *NATSConn) PublishOrderBookSnapshot(symbol string, bids, asks [][2]float64) error {
@@ -48,7 +43,7 @@ func (n *NATSConn) PublishOrderBookSnapshot(symbol string, bids, asks [][2]float
 		return err
 	}
 
-	return n.nc.Publish(OrderBookSnapshotTopic, data)
+	return n.nc.Publish(models.OrderBookSnapshotTopic, data)
 }
 
 func (n *NATSConn) Close() {

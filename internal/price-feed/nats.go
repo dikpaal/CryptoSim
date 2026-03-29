@@ -6,10 +6,6 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const (
-	PricesLiveTopic = "prices.live"
-)
-
 type NATSConn struct {
 	nc *nats.Conn
 }

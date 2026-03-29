@@ -34,3 +34,4 @@ go.work.sum
 
 PRD.md
 SESSION_NOTES.md
+*.json

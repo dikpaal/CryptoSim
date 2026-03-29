@@ -154,6 +154,6 @@ func (priceFeedService *PriceFeedService) startLivePricesPublisher() {
 
 	for priceTick := range readChannel {
 		data, _ := json.Marshal(priceTick)
-		priceFeedService.natsConn.nc.Publish(PricesLiveTopic, data)
+		priceFeedService.natsConn.nc.Publish(models.PricesLiveTopic, data)
 	}
 }
