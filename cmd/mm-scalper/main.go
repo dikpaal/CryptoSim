@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/nats-io/nats.go"
@@ -22,15 +23,15 @@ func main() {
 	defer nc.Close()
 
 	strategy := marketmaker.NewScalperStrategy(marketmaker.ScalperConfig{
-		SpreadBps:              5.0,
-		QuoteQty:               0.01,
+		SpreadBps:              getEnvFloat("SPREAD_BPS", 5.0),
+		QuoteQty:               getEnvFloat("QUOTE_QTY", 0.01),
 		InventorySkewThreshold: 0.1,
 	})
 
 	mm := marketmaker.NewMarketMaker(nc, marketmaker.Config{
 		ID:           mmID,
 		Symbol:       symbol,
-		MaxInventory: 0.5,
+		MaxInventory: getEnvFloat("MAX_INVENTORY", 5),
 		MaxOrders:    10,
 		Strategy:     strategy,
 	})
@@ -52,6 +53,15 @@ func main() {
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return fallback
+}
+
+func getEnvFloat(key string, fallback float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if f, err := strconv.ParseFloat(value, 64); err == nil {
+			return f
+		}
 	}
 	return fallback
 }

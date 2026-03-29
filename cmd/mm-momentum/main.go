@@ -1,10 +1,11 @@
 package main
 
 import (
-	"cryptosim/internal/market-maker"
+	marketmaker "cryptosim/internal/market-maker"
 	"log"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 
 	"github.com/nats-io/nats.go"
@@ -23,7 +24,7 @@ func main() {
 
 	strategy := marketmaker.NewMomentumStrategy(marketmaker.MomentumConfig{
 		SpreadBps:         10.0,
-		QuoteQty:          0.015,
+		QuoteQty:          getEnvFloat("QUOTE_QTY", 0.015),
 		MomentumThreshold: 0.0002,
 		EMAWindow:         10,
 	})
@@ -31,7 +32,7 @@ func main() {
 	mm := marketmaker.NewMarketMaker(nc, marketmaker.Config{
 		ID:           mmID,
 		Symbol:       symbol,
-		MaxInventory: 0.5,
+		MaxInventory: getEnvFloat("MAX_INVENTORY", 5),
 		MaxOrders:    8,
 		Strategy:     strategy,
 	})
@@ -53,6 +54,15 @@ func main() {
 func getEnv(key, fallback string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return fallback
+}
+
+func getEnvFloat(key string, fallback float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if f, err := strconv.ParseFloat(value, 64); err == nil {
+			return f
+		}
 	}
 	return fallback
 }
