@@ -3,9 +3,11 @@ package engine
 import (
 	"container/heap"
 	"cryptosim/internal/models"
+	"sync"
 )
 
 type OrderBook struct {
+	mu     sync.RWMutex
 	symbol string
 	bids   *models.MaxHeap
 	asks   *models.MinHeap
@@ -28,6 +30,8 @@ func NewOrderBook(symbol string) *OrderBook {
 }
 
 func (orderBook *OrderBook) SubmitOrder(order *models.Order) []*models.Trade {
+	orderBook.mu.Lock()
+	defer orderBook.mu.Unlock()
 
 	trades := []*models.Trade{}
 
@@ -169,6 +173,9 @@ func (orderBook *OrderBook) addToBook(order *models.Order) {
 }
 
 func (orderBook *OrderBook) CancelOrder(orderID string) bool {
+	orderBook.mu.Lock()
+	defer orderBook.mu.Unlock()
+
 	order, exists := orderBook.orders[orderID]
 	if !exists {
 		return false
@@ -183,6 +190,9 @@ func (orderBook *OrderBook) CancelOrder(orderID string) bool {
 }
 
 func (orderBook *OrderBook) GetSnapshot(depth int) ([][2]float64, [][2]float64) {
+	orderBook.mu.RLock()
+	defer orderBook.mu.RUnlock()
+
 	asks := [][2]float64{}
 	bids := [][2]float64{}
 
@@ -249,6 +259,9 @@ func (orderBook *OrderBook) peekOpposite(side models.Side) *models.Order {
 }
 
 func (ob *OrderBook) GetOrder(orderID string) (*models.Order, bool) {
+	ob.mu.RLock()
+	defer ob.mu.RUnlock()
+
 	order, exists := ob.orders[orderID]
 	return order, exists
 }
