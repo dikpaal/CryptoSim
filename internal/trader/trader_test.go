@@ -101,8 +101,8 @@ func TestNewTraderService_ValidConfig(t *testing.T) {
 
 	assert.Equal(t, cfg.ID, trader.cfg.ID)
 	assert.Equal(t, cfg.Symbol, trader.cfg.Symbol)
-	assert.Equal(t, DefaultSubmitSubject, trader.submitSubject)
-	assert.Equal(t, DefaultCancelSubject, trader.cancelSubject)
+	assert.Equal(t, DefaultSubmitTopic, trader.submitTopic)
+	assert.Equal(t, DefaultCancelTopic, trader.cancelTopic)
 	assert.NotNil(t, trader.rng)
 	assert.Equal(t, time.Second/time.Duration(cfg.OrdersPerSec), trader.interval)
 }
@@ -181,7 +181,7 @@ func TestTrader_SubmitOrderIntegration(t *testing.T) {
 	var mu sync.Mutex
 	receivedOrders := []OrderSubmitRequest{}
 
-	_, err = nc.QueueSubscribe(DefaultSubmitSubject, "test-engine", func(msg *nats.Msg) {
+	_, err = nc.QueueSubscribe(DefaultSubmitTopic, "test-engine", func(msg *nats.Msg) {
 		var req OrderSubmitRequest
 		if err := json.Unmarshal(msg.Data, &req); err != nil {
 			return
@@ -246,7 +246,7 @@ func TestTrader_RunAndStop(t *testing.T) {
 
 	// Set up mock engine responder
 	var orderCount int64
-	_, err = nc.QueueSubscribe(DefaultSubmitSubject, "test-engine", func(msg *nats.Msg) {
+	_, err = nc.QueueSubscribe(DefaultSubmitTopic, "test-engine", func(msg *nats.Msg) {
 		var req OrderSubmitRequest
 		if err := json.Unmarshal(msg.Data, &req); err != nil {
 			return
@@ -352,7 +352,7 @@ func TestTrader_MaxInFlightEnforcement(t *testing.T) {
 	var maxConcurrent int32
 	var mu sync.Mutex
 
-	_, err = nc.QueueSubscribe(DefaultSubmitSubject, "test-engine", func(msg *nats.Msg) {
+	_, err = nc.QueueSubscribe(DefaultSubmitTopic, "test-engine", func(msg *nats.Msg) {
 		mu.Lock()
 		concurrentRequests++
 		if concurrentRequests > maxConcurrent {
