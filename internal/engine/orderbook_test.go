@@ -35,8 +35,8 @@ func TestLimitOrderMatching(t *testing.T) {
 		t.Errorf("Expected trade qty 0.5, got %f", trade.Qty)
 	}
 
-	if trade.BuyerMMID != "mm1" || trade.SellerMMID != "mm2" {
-		t.Errorf("Expected buyer mm1 and seller mm2, got %s and %s", trade.BuyerMMID, trade.SellerMMID)
+	if trade.BuyerID != "mm1" || trade.SellerID != "mm2" {
+		t.Errorf("Expected buyer mm1 and seller mm2, got %s and %s", trade.BuyerID, trade.SellerID)
 	}
 
 	if sellOrder.Status != models.Filled {

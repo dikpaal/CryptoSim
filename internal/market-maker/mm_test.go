@@ -10,7 +10,7 @@ import (
 )
 
 type MockStrategy struct {
-	name        string
+	name          string
 	quoteToReturn *Quote
 	tradesCalled  int
 	ticksCalled   int
@@ -191,8 +191,8 @@ func TestMarketMaker_HandleTradeExecuted_Buyer(t *testing.T) {
 	mm.avgCost = 50000.0
 
 	trade := models.Trade{
-		BuyerMMID:     "mm-test",
-		SellerMMID:    "mm-other",
+		BuyerID:       "mm-test",
+		SellerID:      "mm-other",
 		Price:         50100.0,
 		Qty:           0.05,
 		BuyerOrderID:  "order-123",
@@ -239,8 +239,8 @@ func TestMarketMaker_HandleTradeExecuted_Seller(t *testing.T) {
 	mm.avgCost = 50000.0
 
 	trade := models.Trade{
-		BuyerMMID:     "mm-other",
-		SellerMMID:    "mm-test",
+		BuyerID:       "mm-other",
+		SellerID:      "mm-test",
 		Price:         50100.0,
 		Qty:           0.03,
 		BuyerOrderID:  "order-123",
@@ -286,10 +286,10 @@ func TestMarketMaker_HandleTradeExecuted_NotInvolved(t *testing.T) {
 	mm := NewMarketMaker(nil, cfg)
 
 	trade := models.Trade{
-		BuyerMMID:  "mm-other1",
-		SellerMMID: "mm-other2",
-		Price:      50100.0,
-		Qty:        0.05,
+		BuyerID:  "mm-other1",
+		SellerID: "mm-other2",
+		Price:    50100.0,
+		Qty:      0.05,
 	}
 
 	tradeData, _ := json.Marshal(trade)
@@ -372,4 +372,3 @@ func TestSignChanged(t *testing.T) {
 		}
 	}
 }
-
