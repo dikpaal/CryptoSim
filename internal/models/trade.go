@@ -11,8 +11,8 @@ type Trade struct {
 	Symbol        string
 	Price         float64
 	Qty           float64
-	BuyerMMID     string
-	SellerMMID    string
+	BuyerID       string
+	SellerID      string
 	BuyerOrderID  string
 	SellerOrderID string
 	ExecutedAt    time.Time
@@ -24,8 +24,8 @@ func NewTrade(symbol string, price, qty float64, buyOrder, sellOrder *Order) *Tr
 		Symbol:        symbol,
 		Price:         price,
 		Qty:           qty,
-		BuyerMMID:     buyOrder.MMID,
-		SellerMMID:    sellOrder.MMID,
+		BuyerID:       buyOrder.ID,
+		SellerID:      sellOrder.ID,
 		BuyerOrderID:  buyOrder.ID,
 		SellerOrderID: sellOrder.ID,
 		ExecutedAt:    time.Now(),

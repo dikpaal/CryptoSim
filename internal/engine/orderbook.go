@@ -78,13 +78,13 @@ func (orderBook *OrderBook) matchMarketOrder(order *models.Order) []*models.Trad
 		if order.Side == models.Bid {
 			trade.BuyerOrderID = order.ID
 			trade.SellerOrderID = bestRestingOrder.ID
-			trade.BuyerMMID = order.MMID
-			trade.SellerMMID = bestRestingOrder.MMID
+			trade.BuyerID = order.Creator_ID
+			trade.SellerID = bestRestingOrder.Creator_ID
 		} else {
 			trade.BuyerOrderID = bestRestingOrder.ID
 			trade.SellerOrderID = order.ID
-			trade.BuyerMMID = bestRestingOrder.MMID
-			trade.SellerMMID = order.MMID
+			trade.BuyerID = bestRestingOrder.Creator_ID
+			trade.SellerID = order.Creator_ID
 		}
 
 		order.Fill(filledQuantity)
@@ -138,13 +138,13 @@ func (orderBook *OrderBook) matchLimitOrder(order *models.Order) []*models.Trade
 		if order.Side == models.Bid {
 			trade.BuyerOrderID = order.ID
 			trade.SellerOrderID = restingOrder.ID
-			trade.BuyerMMID = order.MMID
-			trade.SellerMMID = restingOrder.MMID
+			trade.BuyerID = order.Creator_ID
+			trade.SellerID = restingOrder.Creator_ID
 		} else {
 			trade.BuyerOrderID = restingOrder.ID
 			trade.SellerOrderID = order.ID
-			trade.BuyerMMID = restingOrder.MMID
-			trade.SellerMMID = order.MMID
+			trade.BuyerID = restingOrder.Creator_ID
+			trade.SellerID = order.Creator_ID
 		}
 
 		order.Fill(fillQty)

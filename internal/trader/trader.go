@@ -4,161 +4,283 @@ import (
 	"context"
 	"cryptosim/internal/models"
 	"encoding/json"
-	"errors"
 	"log"
-	"math/rand"
-	"sync/atomic"
+	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 )
 
 type Config struct {
-	ID             string
-	Symbol         string
-	BuyRatio       float64       // BuyRatio is the fraction of orders that are buys (BID) vs sells (ASK).
-	MinQty         float64       // MinQty is the minimum order size.
-	MaxQty         float64       // MaxQty is the maximum order size.
-	RequestTimeout time.Duration // NOTE FOR MYSELF: if the engine doesnt reply withing X, give up and return a timeout
+	ID           string
+	Symbol       string
+	MaxInventory float64
+	MaxOrders    int
+	Strategy     Strategy
 }
 
-type Trader struct {
-	cfg    Config
-	nc     *nats.Conn
-	ctx    context.Context
-	cancel context.CancelFunc
-	rng    *rand.Rand
-
-	// Counters for basic benchmarking/visibility.
-	submitted     atomic.Uint64
-	ackedAccepted atomic.Uint64
-	ackedRejected atomic.Uint64
-	timeouts      atomic.Uint64
-	errors        atomic.Uint64
-}
-
-type Stats struct {
-	Submitted     uint64 // Submitted counts submit attempts (requests sent).
-	AckedAccepted uint64 // AckedAccepted counts acks that indicate the order was accepted.
-	AckedRejected uint64 // AckedRejected counts acks that indicate the order was rejected.
-	Timeouts      uint64 // Timeouts counts request-reply timeouts.
-	Errors        uint64 // Errors counts other submission/encoding/transport errors.
-}
-
-type OrderSubmitRequest struct {
-	ClientOrderID string  `json:"client_order_id"`
-	MMID          string  `json:"mm_id"`
-	Symbol        string  `json:"symbol"`
-	Side          string  `json:"side"`
-	Type          string  `json:"type"`
-	Price         float64 `json:"price"`
-	Qty           float64 `json:"qty"`
+type Status struct {
+	ID            string  `json:"id"`
+	Strategy      string  `json:"strategy"`
+	Inventory     float64 `json:"inventory"`
+	RealizedPnL   float64 `json:"realized_pnl"`
+	UnrealizedPnL float64 `json:"unrealized_pnl"`
+	OpenOrders    int     `json:"open_orders"`
 	Timestamp     int64   `json:"timestamp"`
 }
 
-type OrderSubmitReply struct {
-	ClientOrderID string `json:"client_order_id"`
-	OrderID       string `json:"order_id"`
-	Accepted      bool   `json:"accepted"`
-	Status        string `json:"status"`
-	Reason        string `json:"reason,omitempty"`
+type Trader struct {
+	cfg      Config
+	nc       *nats.Conn
+	strategy Strategy
+
+	mu           sync.RWMutex
+	inventory    float64
+	realizedPnL  float64
+	avgCost      float64
+	currentMid   float64
+	activeOrders map[string]bool
+
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
-func NewTraderService(nc *nats.Conn, cfg Config) (*Trader, error) {
-	if nc == nil {
-		return nil, errors.New("nats connection is nil")
-	}
-	if cfg.ID == "" {
-		return nil, errors.New("trader id is required")
-	}
-	if cfg.Symbol == "" {
-		return nil, errors.New("symbol is required")
-	}
-
-	cfg.RequestTimeout = 250 * time.Millisecond
-
+func NewTrader(nc *nats.Conn, cfg Config) *Trader {
 	ctx, cancel := context.WithCancel(context.Background())
-
 	return &Trader{
-		cfg:    cfg,
-		nc:     nc,
-		ctx:    ctx,
-		cancel: cancel,
-
-		rng: rand.New(rand.NewSource(time.Now().UnixNano())),
-	}, nil
-}
-
-func (t *Trader) Stop() {
-	if t != nil && t.cancel != nil {
-		t.cancel()
+		cfg:          cfg,
+		nc:           nc,
+		strategy:     cfg.Strategy,
+		activeOrders: make(map[string]bool),
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 }
 
-func (t *Trader) SnapshotStats() Stats {
-	return Stats{
-		Submitted:     t.submitted.Load(),
-		AckedAccepted: t.ackedAccepted.Load(),
-		AckedRejected: t.ackedRejected.Load(),
-		Timeouts:      t.timeouts.Load(),
-		Errors:        t.errors.Load(),
+func (trader *Trader) Run() error {
+	if _, err := trader.nc.Subscribe(models.PricesLiveTopic, trader.handlePriceTick); err != nil {
+		return err
+	}
+	log.Printf("trader %s subscribed to %s", trader.cfg.ID, models.PricesLiveTopic)
+
+	if _, err := trader.nc.Subscribe(models.TradesExecutedTopic, trader.handleTradeExecuted); err != nil {
+		return err
+	}
+	log.Printf("trader %s subscribed to %s", trader.cfg.ID, models.TradesExecutedTopic)
+
+	go trader.publishStatusLoop()
+
+	log.Printf("trader %s (%s) started", trader.cfg.ID, trader.strategy.Name())
+	<-trader.ctx.Done()
+	return nil
+}
+
+func (trader *Trader) Stop() {
+	trader.cancel()
+}
+
+func (trader *Trader) handlePriceTick(msg *nats.Msg) {
+	var tick PriceTick
+	if err := json.Unmarshal(msg.Data, &tick); err != nil {
+		log.Printf("Error unmarshaling price tick: %v", err)
+		return
+	}
+
+	trader.mu.Lock()
+	trader.currentMid = tick.Mid
+	inventory := trader.inventory
+	trader.mu.Unlock()
+
+	quote := trader.strategy.OnPriceTick(tick, inventory)
+	if quote == nil {
+		return
+	}
+
+	trader.mu.RLock()
+	openOrders := len(trader.activeOrders)
+	trader.mu.RUnlock()
+
+	if abs(inventory) >= trader.cfg.MaxInventory {
+		log.Printf("trader %s: inventory limit reached (%f)", trader.cfg.ID, inventory)
+		return
+	}
+
+	if openOrders >= trader.cfg.MaxOrders {
+		trader.cancelAllOrders()
+	}
+
+	trader.submitQuote(quote)
+}
+
+func (trader *Trader) handleTradeExecuted(msg *nats.Msg) {
+	var trade models.Trade
+	if err := json.Unmarshal(msg.Data, &trade); err != nil {
+		log.Printf("Error unmarshaling trade: %v", err)
+		return
+	}
+
+	trader.mu.Lock()
+	defer trader.mu.Unlock()
+
+	isBuyer := trade.BuyerID == trader.cfg.ID
+	isSeller := trade.SellerID == trader.cfg.ID
+
+	if !isBuyer && !isSeller {
+		return
+	}
+
+	delete(trader.activeOrders, trade.BuyerOrderID)
+	delete(trader.activeOrders, trade.SellerOrderID)
+
+	oldInventory := trader.inventory
+	if isBuyer {
+		trader.inventory += trade.Qty
+	}
+	if isSeller {
+		trader.inventory -= trade.Qty
+	}
+
+	if oldInventory != 0 && signChanged(oldInventory, trader.inventory) {
+		trader.realizedPnL += oldInventory * (trade.Price - trader.avgCost)
+		trader.avgCost = trade.Price
+	} else {
+		totalCost := trader.avgCost*abs(oldInventory) + trade.Price*trade.Qty
+		trader.avgCost = totalCost / abs(trader.inventory)
 	}
 }
 
-// NOTE TO MYSELF: each trader runs for 100s
-func (t *Trader) Run() {
-	log.Printf("Trader %s starting: symbol=%s", t.cfg.ID, t.cfg.Symbol)
-
-	ticker := time.NewTicker(100 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-t.ctx.Done():
-			log.Printf("Trader %s stopping", t.cfg.ID)
-			return
-		case <-ticker.C:
-			go t.submitOrder()
-		}
+func (trader *Trader) submitQuote(quote *Quote) {
+	if quote.BidQty > 0 && quote.BidPrice > 0 {
+		trader.submitOrder("BID", "LIMIT", quote.BidPrice, quote.BidQty)
+	}
+	if quote.AskQty > 0 && quote.AskPrice > 0 {
+		trader.submitOrder("ASK", "LIMIT", quote.AskPrice, quote.AskQty)
 	}
 }
 
-func (t *Trader) submitOrder() {
+func (trader *Trader) submitOrder(side, orderType string, price, qty float64) {
+	req := map[string]interface{}{
+		"client_order_id": uuid.New().String(),
+		"id":              trader.cfg.ID,
+		"symbol":          trader.cfg.Symbol,
+		"side":            side,
+		"type":            orderType,
+		"price":           price,
+		"qty":             qty,
+		"timestamp":       time.Now().UnixNano(),
+	}
 
-	order := t.generateOrder()
-
-	reqData, err := json.Marshal(order)
+	reqData, err := json.Marshal(req)
 	if err != nil {
-		t.errors.Add(1)
 		log.Printf("Error marshaling order: %v", err)
 		return
 	}
 
-	t.submitted.Add(1)
-	msg, err := t.nc.Request(models.SubmitTopic, reqData, t.cfg.RequestTimeout)
+	msg, err := trader.nc.Request(models.OrdersSubmitTopic, reqData, 250*time.Millisecond)
 	if err != nil {
-		if err == nats.ErrTimeout {
-			t.timeouts.Add(1)
-		} else {
-			t.errors.Add(1)
-		}
 		return
 	}
 
-	var reply OrderSubmitReply
+	var reply map[string]interface{}
 	if err := json.Unmarshal(msg.Data, &reply); err != nil {
-		t.errors.Add(1)
-		log.Printf("Error unmarshaling reply: %v", err)
 		return
 	}
 
-	if reply.Accepted {
-		t.ackedAccepted.Add(1)
-	} else {
-		t.ackedRejected.Add(1)
+	if accepted, ok := reply["accepted"].(bool); ok && accepted {
+		if orderID, ok := reply["order_id"].(string); ok {
+			trader.mu.Lock()
+			trader.activeOrders[orderID] = true
+			trader.mu.Unlock()
+		}
 	}
 }
 
-func (t *Trader) generateOrder() OrderSubmitRequest {
-	//
+func (trader *Trader) cancelAllOrders() {
+	trader.mu.Lock()
+	orderIDs := make([]string, 0, len(trader.activeOrders))
+	for orderID := range trader.activeOrders {
+		orderIDs = append(orderIDs, orderID)
+	}
+	trader.mu.Unlock()
+
+	for _, orderID := range orderIDs {
+		trader.cancelOrder(orderID)
+	}
+}
+
+func (trader *Trader) cancelOrder(orderID string) {
+	req := map[string]interface{}{
+		"client_cancel_id": uuid.New().String(),
+		"id":               trader.cfg.ID,
+		"order_id":         orderID,
+		"timestamp":        time.Now().UnixNano(),
+	}
+
+	reqData, err := json.Marshal(req)
+	if err != nil {
+		return
+	}
+
+	trader.nc.Request(models.OrdersCancelTopic, reqData, 250*time.Millisecond)
+
+	trader.mu.Lock()
+	delete(trader.activeOrders, orderID)
+	trader.mu.Unlock()
+}
+
+func (trader *Trader) publishStatusLoop() {
+	ticker := time.NewTicker(500 * time.Millisecond)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-trader.ctx.Done():
+			return
+		case <-ticker.C:
+			trader.publishStatus()
+		}
+	}
+}
+
+func (trader *Trader) publishStatus() {
+	trader.mu.RLock()
+	inventory := trader.inventory
+	realizedPnL := trader.realizedPnL
+	currentMid := trader.currentMid
+	openOrders := len(trader.activeOrders)
+	trader.mu.RUnlock()
+
+	unrealizedPnL := 0.0
+	if inventory != 0 && currentMid > 0 {
+		unrealizedPnL = inventory * (currentMid - trader.avgCost)
+	}
+
+	status := Status{
+		ID:            trader.cfg.ID,
+		Strategy:      trader.strategy.Name(),
+		Inventory:     inventory,
+		RealizedPnL:   realizedPnL,
+		UnrealizedPnL: unrealizedPnL,
+		OpenOrders:    openOrders,
+		Timestamp:     time.Now().UnixNano(),
+	}
+
+	data, err := json.Marshal(status)
+	if err != nil {
+		return
+	}
+
+	trader.nc.Publish(models.StatusTopic, data)
+}
+
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
+}
+
+func signChanged(old, new float64) bool {
+	return (old > 0 && new < 0) || (old < 0 && new > 0)
 }

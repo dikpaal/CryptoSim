@@ -7,33 +7,33 @@ import (
 )
 
 type Order struct {
-	ID        string
-	MMID      string
-	Symbol    string
-	Side      Side
-	OrderType OrderType
-	Price     float64
-	Qty       float64
-	FilledQty float64
-	Status    OrderStatus
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID         string
+	Creator_ID string
+	Symbol     string
+	Side       Side
+	OrderType  OrderType
+	Price      float64
+	Qty        float64
+	FilledQty  float64
+	Status     OrderStatus
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
-func NewOrder(mmID, symbol string, side Side, orderType OrderType, price, qty float64) *Order {
+func NewOrder(creator_ID, symbol string, side Side, orderType OrderType, price, qty float64) *Order {
 	now := time.Now()
 	return &Order{
-		ID:        uuid.New().String(),
-		MMID:      mmID,
-		Symbol:    symbol,
-		Side:      side,
-		OrderType: orderType,
-		Price:     price,
-		Qty:       qty,
-		FilledQty: 0,
-		Status:    Pending,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:         uuid.New().String(),
+		Creator_ID: creator_ID,
+		Symbol:     symbol,
+		Side:       side,
+		OrderType:  orderType,
+		Price:      price,
+		Qty:        qty,
+		FilledQty:  0,
+		Status:     Pending,
+		CreatedAt:  now,
+		UpdatedAt:  now,
 	}
 }
 

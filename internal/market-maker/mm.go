@@ -12,14 +12,6 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const (
-	PricesLiveTopic     = "prices.live"
-	TradesExecutedTopic = "trades.executed"
-	OrdersSubmitTopic   = "orders.submit"
-	OrdersCancelTopic   = "orders.cancel"
-	MMStatusTopic       = "mm.status"
-)
-
 type Config struct {
 	ID           string
 	Symbol       string
@@ -28,8 +20,8 @@ type Config struct {
 	Strategy     Strategy
 }
 
-type MMStatus struct {
-	MMID          string  `json:"mm_id"`
+type Status struct {
+	ID            string  `json:"id"`
 	Strategy      string  `json:"strategy"`
 	Inventory     float64 `json:"inventory"`
 	RealizedPnL   float64 `json:"realized_pnl"`
@@ -67,15 +59,15 @@ func NewMarketMaker(nc *nats.Conn, cfg Config) *MarketMaker {
 }
 
 func (mm *MarketMaker) Run() error {
-	if _, err := mm.nc.Subscribe(PricesLiveTopic, mm.handlePriceTick); err != nil {
+	if _, err := mm.nc.Subscribe(models.PricesLiveTopic, mm.handlePriceTick); err != nil {
 		return err
 	}
-	log.Printf("MM %s subscribed to %s", mm.cfg.ID, PricesLiveTopic)
+	log.Printf("MM %s subscribed to %s", mm.cfg.ID, models.PricesLiveTopic)
 
-	if _, err := mm.nc.Subscribe(TradesExecutedTopic, mm.handleTradeExecuted); err != nil {
+	if _, err := mm.nc.Subscribe(models.TradesExecutedTopic, mm.handleTradeExecuted); err != nil {
 		return err
 	}
-	log.Printf("MM %s subscribed to %s", mm.cfg.ID, TradesExecutedTopic)
+	log.Printf("MM %s subscribed to %s", mm.cfg.ID, models.TradesExecutedTopic)
 
 	go mm.publishStatusLoop()
 
@@ -131,8 +123,8 @@ func (mm *MarketMaker) handleTradeExecuted(msg *nats.Msg) {
 	mm.mu.Lock()
 	defer mm.mu.Unlock()
 
-	isBuyer := trade.BuyerMMID == mm.cfg.ID
-	isSeller := trade.SellerMMID == mm.cfg.ID
+	isBuyer := trade.BuyerID == mm.cfg.ID
+	isSeller := trade.SellerID == mm.cfg.ID
 
 	if !isBuyer && !isSeller {
 		return
@@ -185,7 +177,7 @@ func (mm *MarketMaker) submitOrder(side, orderType string, price, qty float64) {
 		return
 	}
 
-	msg, err := mm.nc.Request(OrdersSubmitTopic, reqData, 250*time.Millisecond)
+	msg, err := mm.nc.Request(models.OrdersSubmitTopic, reqData, 250*time.Millisecond)
 	if err != nil {
 		return
 	}
@@ -220,7 +212,7 @@ func (mm *MarketMaker) cancelAllOrders() {
 func (mm *MarketMaker) cancelOrder(orderID string) {
 	req := map[string]interface{}{
 		"client_cancel_id": uuid.New().String(),
-		"mm_id":            mm.cfg.ID,
+		"creator_id":       mm.cfg.ID,
 		"order_id":         orderID,
 		"timestamp":        time.Now().UnixNano(),
 	}
@@ -230,7 +222,7 @@ func (mm *MarketMaker) cancelOrder(orderID string) {
 		return
 	}
 
-	mm.nc.Request(OrdersCancelTopic, reqData, 250*time.Millisecond)
+	mm.nc.Request(models.OrdersCancelTopic, reqData, 250*time.Millisecond)
 
 	mm.mu.Lock()
 	delete(mm.activeOrders, orderID)
@@ -264,8 +256,8 @@ func (mm *MarketMaker) publishStatus() {
 		unrealizedPnL = inventory * (currentMid - mm.avgCost)
 	}
 
-	status := MMStatus{
-		MMID:          mm.cfg.ID,
+	status := Status{
+		ID:            mm.cfg.ID,
 		Strategy:      mm.strategy.Name(),
 		Inventory:     inventory,
 		RealizedPnL:   realizedPnL,
@@ -279,7 +271,7 @@ func (mm *MarketMaker) publishStatus() {
 		return
 	}
 
-	mm.nc.Publish(MMStatusTopic, data)
+	mm.nc.Publish(models.StatusTopic, data)
 }
 
 func abs(x float64) float64 {

@@ -74,10 +74,10 @@ func startSnapshotPublisher(engine *Engine, interval time.Duration) {
 	}
 }
 
-// NATS request payload for orders.submit
+// request payload for orders.submit
 type OrderSubmitRequest struct {
 	ClientOrderID string  `json:"client_order_id"`
-	MMID          string  `json:"mm_id"`
+	Creator_ID    string  `json:"creator_id"`
 	Symbol        string  `json:"symbol"`
 	Side          string  `json:"side"`
 	Type          string  `json:"type"`
@@ -86,7 +86,7 @@ type OrderSubmitRequest struct {
 	Timestamp     int64   `json:"timestamp"`
 }
 
-// NATS reply payload for orders.submit
+// reply payload for orders.submit
 type OrderSubmitReply struct {
 	ClientOrderID string `json:"client_order_id"`
 	OrderID       string `json:"order_id"`
@@ -95,22 +95,21 @@ type OrderSubmitReply struct {
 	Reason        string `json:"reason,omitempty"`
 }
 
-// NATS request payload for orders.cancel
+// request payload for orders.cancel
 type OrderCancelRequest struct {
 	ClientCancelID string `json:"client_cancel_id"`
-	MMID           string `json:"mm_id"`
+	Creator_IDID   string `json:"creator_id"`
 	OrderID        string `json:"order_id"`
 	Timestamp      int64  `json:"timestamp"`
 }
 
-// NATS reply payload for orders.cancel
+// reply payload for orders.cancel
 type OrderCancelReply struct {
 	ClientCancelID string `json:"client_cancel_id"`
 	Accepted       bool   `json:"accepted"`
 	Reason         string `json:"reason,omitempty"`
 }
 
-// subscribes to orders.submit and orders.cancel
 func (n *NATSConn) StartRequestReplyHandlers(engine *Engine) error {
 	// orders.submit
 	_, err := n.nc.QueueSubscribe(OrdersSubmitTopic, "engine", func(msg *nats.Msg) {
@@ -137,7 +136,7 @@ func (n *NATSConn) StartRequestReplyHandlers(engine *Engine) error {
 			orderType = models.Market
 		}
 
-		order := models.NewOrder(req.MMID, req.Symbol, side, orderType, req.Price, req.Qty)
+		order := models.NewOrder(req.Creator_ID, req.Symbol, side, orderType, req.Price, req.Qty)
 		trades := engine.orderBook.SubmitOrder(order)
 
 		for _, trade := range trades {

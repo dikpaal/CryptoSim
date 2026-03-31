@@ -1,3 +1,10 @@
+/*
+
+TODO add nats topics for EACH participant
+TODO only persistence and prometheus sub to all trades.executed
+
+*/
+
 package engine
 
 import (
