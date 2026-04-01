@@ -10,7 +10,7 @@ import (
 
 func main() {
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
-	symbol := getEnv("SYMBOL", "BTC-USD")
+	symbols := []string{"BTC-USD", "ETH-USD", "XRP-USD"}
 
 	// Connect to NATS
 	natsConn, err := pricefeed.NewNATSConn(natsURL)
@@ -21,7 +21,7 @@ func main() {
 	log.Printf("Connected to NATS at %s", natsURL)
 
 	// Create and start price feed service
-	pfs := pricefeed.NewPriceFeedService(natsConn, symbol)
+	pfs := pricefeed.NewPriceFeedService(natsConn, symbols)
 	if err := pfs.Start(); err != nil {
 		log.Fatalf("Failed to start price feed service: %v", err)
 	}

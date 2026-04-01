@@ -13,11 +13,12 @@ import (
 )
 
 type Config struct {
-	ID           string
-	Symbol       string
-	MaxInventory float64
-	MaxOrders    int
-	Strategy     Strategy
+	ID                  string
+	Symbol              string
+	MaxInventory        float64
+	MaxOrders           int
+	Strategy            Strategy
+	TradesExecutedTopic string
 }
 
 type Status struct {
@@ -49,9 +50,10 @@ type MarketMaker struct {
 func NewMarketMaker(nc *nats.Conn, cfg Config) *MarketMaker {
 	ctx, cancel := context.WithCancel(context.Background())
 	return &MarketMaker{
-		cfg:          cfg,
-		nc:           nc,
-		strategy:     cfg.Strategy,
+		cfg:      cfg,
+		nc:       nc,
+		strategy: cfg.Strategy,
+
 		activeOrders: make(map[string]bool),
 		ctx:          ctx,
 		cancel:       cancel,
@@ -64,10 +66,10 @@ func (mm *MarketMaker) Run() error {
 	}
 	log.Printf("MM %s subscribed to %s", mm.cfg.ID, models.PricesLiveTopic)
 
-	if _, err := mm.nc.Subscribe(models.TradesExecutedTopic, mm.handleTradeExecuted); err != nil {
+	if _, err := mm.nc.Subscribe(mm.cfg.TradesExecutedTopic, mm.handleTradeExecuted); err != nil {
 		return err
 	}
-	log.Printf("MM %s subscribed to %s", mm.cfg.ID, models.TradesExecutedTopic)
+	log.Printf("MM %s subscribed to %s", mm.cfg.ID, mm.cfg.TradesExecutedTopic)
 
 	go mm.publishStatusLoop()
 
@@ -162,7 +164,7 @@ func (mm *MarketMaker) submitQuote(quote *Quote) {
 func (mm *MarketMaker) submitOrder(side, orderType string, price, qty float64) {
 	req := map[string]interface{}{
 		"client_order_id": uuid.New().String(),
-		"mm_id":           mm.cfg.ID,
+		"id":              mm.cfg.ID,
 		"symbol":          mm.cfg.Symbol,
 		"side":            side,
 		"type":            orderType,

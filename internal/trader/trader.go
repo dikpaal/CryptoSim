@@ -13,11 +13,12 @@ import (
 )
 
 type Config struct {
-	ID           string
-	Symbol       string
-	MaxInventory float64
-	MaxOrders    int
-	Strategy     Strategy
+	ID                  string
+	Symbol              string
+	MaxInventory        float64
+	MaxOrders           int
+	Strategy            Strategy
+	TradesExecutedTopic string
 }
 
 type Status struct {
@@ -64,10 +65,10 @@ func (trader *Trader) Run() error {
 	}
 	log.Printf("trader %s subscribed to %s", trader.cfg.ID, models.PricesLiveTopic)
 
-	if _, err := trader.nc.Subscribe(models.TradesExecutedTopic, trader.handleTradeExecuted); err != nil {
+	if _, err := trader.nc.Subscribe(trader.cfg.TradesExecutedTopic, trader.handleTradeExecuted); err != nil {
 		return err
 	}
-	log.Printf("trader %s subscribed to %s", trader.cfg.ID, models.TradesExecutedTopic)
+	log.Printf("trader %s subscribed to %s", trader.cfg.ID, trader.cfg.TradesExecutedTopic)
 
 	go trader.publishStatusLoop()
 

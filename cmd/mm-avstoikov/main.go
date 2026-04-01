@@ -2,6 +2,7 @@ package main
 
 import (
 	marketmaker "cryptosim/internal/market-maker"
+	"cryptosim/internal/models"
 	"log"
 	"os"
 	"os/signal"
@@ -30,11 +31,12 @@ func main() {
 	})
 
 	mm := marketmaker.NewMarketMaker(nc, marketmaker.Config{
-		ID:           mmID,
-		Symbol:       symbol,
-		MaxInventory: getEnvFloat("MAX_INVENTORY", 5),
-		MaxOrders:    12,
-		Strategy:     strategy,
+		ID:                  mmID,
+		Symbol:              symbol,
+		MaxInventory:        getEnvFloat("MAX_INVENTORY", 5),
+		MaxOrders:           12,
+		Strategy:            strategy,
+		TradesExecutedTopic: models.AvstoikovTradeExecutedTopic,
 	})
 
 	go func() {
