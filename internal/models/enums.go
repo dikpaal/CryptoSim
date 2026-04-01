@@ -35,6 +35,8 @@ const (
 
 const (
 	BTC_USD ProductId = "BTC-USD"
+	XRP_USD ProductId = "XRP-USD"
+	ETH_USD ProductId = "ETH-USD"
 )
 
 const (

@@ -61,31 +61,34 @@ type PriceTick struct {
 type PriceFeedService struct {
 	wsConn   *websocket.Conn
 	natsConn *NATSConn
-	symbol   string
+	symbols  []string
 }
 
-func NewPriceFeedService(natsConn *NATSConn, symbol string) *PriceFeedService {
+func NewPriceFeedService(natsConn *NATSConn, symbols []string) *PriceFeedService {
 	return &PriceFeedService{
 		natsConn: natsConn,
-		symbol:   symbol,
+		symbols:  symbols,
 	}
 }
 
 func (pfs *PriceFeedService) Start() error {
-	// Connect to Coinbase WebSocket
 	conn, _, err := pfs.dial("wss://advanced-trade-ws.coinbase.com")
 	if err != nil {
 		return fmt.Errorf("failed to connect to Coinbase: %w", err)
 	}
+
 	pfs.wsConn = conn
 	log.Println("Connected to Coinbase WebSocket")
 
-	// Subscribe to ticker channel
-	productID := models.ProductId(pfs.symbol)
-	pfs.subscribe(conn, "subscribe", []models.ProductId{productID}, models.Ticker)
-	log.Printf("Subscribed to ticker for %s", pfs.symbol)
+	var productIDs []models.ProductId
 
-	// Start publishing prices to NATS
+	for _, symbol := range pfs.symbols {
+		productIDs = append(productIDs, models.ProductId(symbol))
+	}
+
+	pfs.subscribe(conn, "subscribe", productIDs, models.Ticker)
+	log.Printf("Subscribed to ticker for %v", pfs.symbols)
+
 	go pfs.startLivePricesPublisher()
 	return nil
 }
@@ -130,14 +133,13 @@ func (priceFeedService *PriceFeedService) ReconnectWithExponentialBackoff(numTri
 		conn, _, err := priceFeedService.dial(endpoint)
 		if err == nil {
 			priceFeedService.wsConn = conn
-			priceFeedService.subscribe(conn, "subscribe", []models.ProductId{models.BTC_USD}, models.Ticker)
+			priceFeedService.subscribe(conn, "subscribe", []models.ProductId{models.BTC_USD, models.XRP_USD, models.ETH_USD}, models.Ticker)
 		}
 	}
 	log.Fatalln("Could not reconnect, stopping the sim!")
 }
 
 func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
-
 	priceTickChannel := make(chan PriceTick)
 
 	go func() {
@@ -145,6 +147,7 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
 
 		for {
 			var tickerResponse TickerResponse
+			fmt.Println("TICKER REPONSE: ", tickerResponse)
 			err := priceFeedService.wsConn.ReadJSON(&tickerResponse)
 			if err != nil {
 				fmt.Println("PRICE FEED JSON read error. RECONNECTING:", err)
@@ -157,28 +160,29 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
 				continue
 			}
 
-			ticker := tickerResponse.Events[0].Tickers[0]
+			for _, ticker := range tickerResponse.Events[0].Tickers {
+				bid, err := strconv.ParseFloat(ticker.BestBid, 64)
+				if err != nil {
+					fmt.Println("ERROR IN READING BID:", err)
+					continue
+				}
 
-			bid, err := strconv.ParseFloat(ticker.BestBid, 64)
-			if err != nil {
-				fmt.Println("ERROR IN READING BID:", err)
-				continue
-			}
-			ask, err := strconv.ParseFloat(ticker.BestAsk, 64)
-			if err != nil {
-				fmt.Println("ERROR IN READING ASK:", err)
-				continue
-			}
+				ask, err := strconv.ParseFloat(ticker.BestAsk, 64)
+				if err != nil {
+					fmt.Println("ERROR IN READING ASK:", err)
+					continue
+				}
 
-			priceTick := PriceTick{
-				Symbol:    ticker.ProductID,
-				Bid:       bid,
-				Ask:       ask,
-				Mid:       (bid + ask) / 2,
-				Timestamp: time.Now().Unix(),
-			}
+				priceTick := PriceTick{
+					Symbol:    ticker.ProductID,
+					Bid:       bid,
+					Ask:       ask,
+					Mid:       (bid + ask) / 2,
+					Timestamp: time.Now().Unix(),
+				}
 
-			priceTickChannel <- priceTick
+				priceTickChannel <- priceTick
+			}
 		}
 	}()
 

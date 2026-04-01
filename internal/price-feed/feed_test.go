@@ -28,7 +28,7 @@ func TestPriceFeedPublishing(t *testing.T) {
 		var subMsg PriceFeedRequest
 		conn.ReadJSON(&subMsg)
 
-		// Send fake ticker response
+		// Send fake ticker response for all three symbols
 		mockTicker := TickerResponse{
 			Channel:   "ticker",
 			Timestamp: time.Now().Format(time.RFC3339),
@@ -44,6 +44,24 @@ func TestPriceFeedPublishing(t *testing.T) {
 							Volume24H: "1000",
 							Low24H:    "49000",
 							High24H:   "51000",
+						},
+						{
+							ProductID: "ETH-USD",
+							BestBid:   "3000.00",
+							BestAsk:   "3001.00",
+							Price:     "3000.50",
+							Volume24H: "5000",
+							Low24H:    "2900",
+							High24H:   "3100",
+						},
+						{
+							ProductID: "XRP-USD",
+							BestBid:   "0.50",
+							BestAsk:   "0.51",
+							Price:     "0.505",
+							Volume24H: "10000",
+							Low24H:    "0.48",
+							High24H:   "0.52",
 						},
 					},
 				},
@@ -90,26 +108,39 @@ func TestPriceFeedPublishing(t *testing.T) {
 	}
 	defer pfs.wsConn.Close()
 
-	// Subscribe to the ticker channel
-	pfs.subscribe(pfs.wsConn, "subscribe", []models.ProductId{models.BTC_USD}, "ticker")
+	// Subscribe to the ticker channel for all three symbols
+	pfs.subscribe(pfs.wsConn, "subscribe", []models.ProductId{models.BTC_USD, models.ETH_USD, models.XRP_USD}, "ticker")
 
 	// Start publishing in background
 	go pfs.startLivePricesPublisher()
 
-	// Step 4: Wait for message and assert
-	select {
-	case priceTick := <-received:
-		if priceTick.Symbol != "BTC-USD" {
-			t.Errorf("Expected symbol BTC-USD, got %s", priceTick.Symbol)
+	// Step 4: Wait for all three messages and assert
+	expectedPrices := map[string]struct{ bid, ask float64 }{
+		"BTC-USD": {50000.00, 50001.00},
+		"ETH-USD": {3000.00, 3001.00},
+		"XRP-USD": {0.50, 0.51},
+	}
+
+	receivedCount := 0
+	timeout := time.After(3 * time.Second)
+
+	for receivedCount < 3 {
+		select {
+		case priceTick := <-received:
+			expected, ok := expectedPrices[priceTick.Symbol]
+			if !ok {
+				t.Errorf("Unexpected symbol: %s", priceTick.Symbol)
+			}
+			if priceTick.Bid != expected.bid {
+				t.Errorf("Expected bid %f for %s, got %f", expected.bid, priceTick.Symbol, priceTick.Bid)
+			}
+			if priceTick.Ask != expected.ask {
+				t.Errorf("Expected ask %f for %s, got %f", expected.ask, priceTick.Symbol, priceTick.Ask)
+			}
+			t.Logf("Successfully received price data for %s: %+v", priceTick.Symbol, priceTick)
+			receivedCount++
+		case <-timeout:
+			t.Fatalf("Timeout waiting for price data. Received %d/3 symbols", receivedCount)
 		}
-		if priceTick.Bid != 50000.00 {
-			t.Errorf("Expected bid 50000.00, got %f", priceTick.Bid)
-		}
-		if priceTick.Ask != 50001.00 {
-			t.Errorf("Expected ask 50001.00, got %f", priceTick.Ask)
-		}
-		t.Logf("Successfully received price data: %+v", priceTick)
-	case <-time.After(2 * time.Second):
-		t.Fatal("Timeout waiting for price data on NATS")
 	}
 }
