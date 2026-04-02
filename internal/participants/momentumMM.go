@@ -58,17 +58,17 @@ func (momentumMM *MomentumMM) handlePriceInflux(msg *nats.Msg) {
 	momentumMM.cancelAllOrders()
 
 	mid := priceTick.Mid
-	halfSpread := mid * (momentumMM.SpreadBps / 2) * 0.0001
-	spacing := mid * momentumMM.LevelSpacing * 0.0001
+	halfSpread := mid * (momentumMM.SpreadBps / 2) * 0.0001 // convert to dollars
+	spacing := mid * momentumMM.LevelSpacing * 0.0001       // convert spacing to dollars
 
 	var trend float64
 	if momentumMM.PrevMid == -1.0 {
-		trend = mid
+		trend = 0
 	} else {
 		trend = mid - momentumMM.PrevMid
-		momentumMM.PrevMid = mid
 	}
 
+	momentumMM.PrevMid = mid
 	skew := trend * momentumMM.SkewFactor
 
 	for i := 0; i < momentumMM.NumLevels; i++ {

@@ -66,10 +66,10 @@ func (avellanedaStoikovMM *AvellanedaStoikovMM) handlePriceInflux(msg *nats.Msg)
 	sigma := avellanedaStoikovMM.Sigma
 	kappa := avellanedaStoikovMM.Kappa
 
-	reservationPrice := mid - position*gamma*math.Pow(sigma, 2)
+	reservationPrice := mid - position*gamma*math.Pow(sigma, 2)*avellanedaStoikovMM.T
 	spread := gamma*math.Pow(sigma, 2) + (2/gamma)*math.Log(1+gamma/kappa)
+	spacing := mid * avellanedaStoikovMM.LevelSpacing * 0.0001 // convert spacing to dollars
 
-	spacing := avellanedaStoikovMM.LevelSpacing
 	for i := 0; i < avellanedaStoikovMM.NumLevels; i++ {
 		bidPrice := reservationPrice - spread/2 - float64(i)*spacing
 		askPrice := reservationPrice + spread/2 + float64(i)*spacing
