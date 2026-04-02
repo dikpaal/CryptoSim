@@ -1,147 +1,142 @@
-/*
-
-TODO add nats topics for EACH participant
-TODO only persistence and prometheus sub to all trades.executed
-
-*/
-
 package engine
 
 import (
 	"cryptosim/internal/models"
 	"encoding/json"
-	"net/http"
+	"fmt"
 
-	"github.com/go-chi/chi/v5"
+	"github.com/nats-io/nats.go"
 )
 
 type Engine struct {
-	orderBook *OrderBook
-	trades    []*models.Trade
-	natsConn  *NATSConn
+	orderBooks map[string]*OrderBook
+	nc         *nats.Conn
 }
 
-func NewEngine(symbol string) *Engine {
-	return &Engine{
-		orderBook: NewOrderBook(symbol),
-		trades:    make([]*models.Trade, 0, 1000),
+func NewEngine(nc *nats.Conn) *Engine {
+	engine := &Engine{
+		orderBooks: make(map[string]*OrderBook),
+		nc:         nc,
 	}
+
+	engine.orderBooks[string(models.BTC_USD)] = NewOrderBook(string(models.BTC_USD))
+	engine.orderBooks[string(models.ETH_USD)] = NewOrderBook(string(models.ETH_USD))
+	engine.orderBooks[string(models.XRP_USD)] = NewOrderBook(string(models.XRP_USD))
+
+	return engine
 }
 
-type SubmitOrderRequest struct {
-	MMID      string  `json:"mm_id"`
-	Symbol    string  `json:"symbol"`
-	Side      string  `json:"side"`
-	OrderType string  `json:"order_type"`
-	Price     float64 `json:"price"`
-	Qty       float64 `json:"qty"`
+func (engine *Engine) Start() error {
+	_, err1 := engine.nc.Subscribe(models.OrdersSubmitTopic, engine.handleSubmitOrder)
+	if err1 != nil {
+		return fmt.Errorf("subscribe submit: %w", err1)
+	}
+
+	_, err2 := engine.nc.Subscribe(models.OrdersCancelTopic, engine.handleCancelOrder)
+	if err2 != nil {
+		return fmt.Errorf("subscribe cancel: %w", err2)
+	}
+
+	return nil
 }
 
-type SubmitOrderResponse struct {
-	OrderID string `json:"order_id"`
-	Status  string `json:"status"`
-}
-
-type OrderBookResponse struct {
-	Bids [][2]float64 `json:"bids"`
-	Asks [][2]float64 `json:"asks"`
-}
-
-func (engine *Engine) HandleSubmitOrder(w http.ResponseWriter, r *http.Request) {
-
-	var request SubmitOrderRequest
-
-	err := json.NewDecoder(r.Body).Decode(&request)
-
+func (engine *Engine) handleSubmitOrder(msg *nats.Msg) {
+	var order models.Order
+	err := json.Unmarshal(msg.Data, &order)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		engine.replyError(msg, "invalid order payload")
 		return
 	}
 
-	side := models.Bid
-	if request.Side == "ASK" {
-		side = models.Ask
+	orderbook, ok := engine.orderBooks[order.Symbol]
+	if !ok {
+		engine.replyError(msg, "unknown symbol")
+		return
 	}
 
-	orderType := models.Limit
-	if request.OrderType == "MARKET" {
-		orderType = models.Market
-	}
-
-	order := models.NewOrder(request.MMID, request.Symbol, side, orderType, request.Price, request.Qty)
-	trades := engine.orderBook.SubmitOrder(order)
+	trades := orderbook.SubmitOrder(&order)
 
 	for _, trade := range trades {
-		engine.trades = append(engine.trades, trade)
-		if engine.natsConn != nil {
-			engine.natsConn.PublishTrade(trade)
-		}
+		engine.publishTrade(trade)
 	}
 
-	response := SubmitOrderResponse{
+	engine.publishSnapshot(orderbook)
+
+	ack := models.OrderAck{
 		OrderID: order.ID,
 		Status:  string(order.Status),
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
-
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
 }
 
-func (engine *Engine) HandleCancelOrder(w http.ResponseWriter, r *http.Request) {
+func (engine *Engine) handleCancelOrder(msg *nats.Msg) {
+	var cancelRequest models.CancelRequest
+	err := json.Unmarshal(msg.Data, &cancelRequest)
+	if err != nil {
+		engine.replyError(msg, "invalid cancel payload")
+		return
 
-	orderID := chi.URLParam(r, "id")
-	success := engine.orderBook.CancelOrder(orderID)
+	}
 
-	if !success {
-		http.Error(w, "Order not found", http.StatusNotFound)
+	orderbook, ok := engine.orderBooks[cancelRequest.Symbol]
+	if !ok {
+		engine.replyError(msg, "unknown symbol")
 		return
 	}
 
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{"status": "cancelled"})
-}
-
-func (engine *Engine) HandleGetOrderBook(w http.ResponseWriter, r *http.Request) {
-	asks, bids := engine.orderBook.GetSnapshot(10)
-
-	response := OrderBookResponse{
-		Bids: bids,
-		Asks: asks,
+	success := orderbook.CancelOrder(cancelRequest.OrderID)
+	ack := models.CancelAck{
+		Success: success,
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(response)
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
 }
 
-func (engine *Engine) HandleGetTrades(w http.ResponseWriter, r *http.Request) {
-	start := len(engine.trades) - 100
-	if start < 0 {
-		start = 0
-	}
-
-	recentTrades := engine.trades[start:]
-
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(recentTrades)
-}
-
-func (engine *Engine) HandleGetOrder(w http.ResponseWriter, r *http.Request) {
-	orderID := chi.URLParam(r, "id")
-
-	order, exists := engine.orderBook.GetOrder(orderID)
-
-	if !exists {
-		http.Error(w, "Order not found", http.StatusNotFound)
+func (engine *Engine) publishTrade(trade *models.Trade) {
+	data, err := json.Marshal(trade)
+	if err != nil {
+		fmt.Println("COULD NOT PUBLISH TRADE IN PUBLISHTRADE")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(order)
+	var subject string
+
+	if trade.Symbol == string(models.BTC_USD) {
+		subject = models.PriceBTCTopic
+	} else if trade.Symbol == string(models.ETH_USD) {
+		subject = models.PriceETHTopic
+	} else if trade.Symbol == string(models.XRP_USD) {
+		subject = models.PriceXRPTopic
+	}
+
+	engine.nc.Publish(subject, data)
+
 }
 
-func (engine *Engine) HandleHealth(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+func (engine *Engine) publishSnapshot(orderbook *OrderBook) {
+	asks, bids := orderbook.GetSnapshot(10)
+	snapshot := models.OrderbookSnapshot{
+		Symbol: orderbook.symbol,
+		Bids:   bids,
+		Asks:   asks,
+	}
+
+	data, err := json.Marshal(snapshot)
+	if err != nil {
+		return
+	}
+
+	engine.nc.Publish(models.OrderBookSnapshotTopic, data)
+}
+
+func (engine *Engine) replyError(msg *nats.Msg, reason string) {
+	ack := models.OrderAck{
+		Status: "rejected",
+		Reason: reason,
+	}
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
 }

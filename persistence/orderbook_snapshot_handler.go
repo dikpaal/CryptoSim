@@ -54,10 +54,9 @@ func (h *OrderbookSnapshotHandler) Subscribe() {
 		h.mu.Unlock()
 
 		snapshot := models.OrderbookSnapshot{
-			Symbol:     raw["symbol"].(string),
-			Bids:       convertToFloat64Array(raw["bids"]),
-			Asks:       convertToFloat64Array(raw["asks"]),
-			SnapshotAt: time.Now(),
+			Symbol: raw["symbol"].(string),
+			Bids:   convertToFloat64Array(raw["bids"]),
+			Asks:   convertToFloat64Array(raw["asks"]),
 		}
 
 		h.snapshotChan <- snapshot
@@ -124,12 +123,9 @@ func (h *OrderbookSnapshotHandler) writeSnapshotsToDb(snapshots []models.Orderbo
 	_, err := h.db.CopyFrom(
 		ctx,
 		pgx.Identifier{"orderbook_snapshots"},
-		[]string{"symbol", "bids", "asks", "mid_price", "spread", "snapshot_at"},
+		[]string{"symbol", "bids", "asks"},
 		pgx.CopyFromSlice(len(snapshots), func(i int) ([]any, error) {
 			snapshot := snapshots[i]
-
-			midPrice, spread := calculateMidPriceAndSpread(snapshot.Bids, snapshot.Asks)
-
 			bidsJSON, _ := json.Marshal(snapshot.Bids)
 			asksJSON, _ := json.Marshal(snapshot.Asks)
 
@@ -137,23 +133,11 @@ func (h *OrderbookSnapshotHandler) writeSnapshotsToDb(snapshots []models.Orderbo
 				snapshot.Symbol,
 				bidsJSON,
 				asksJSON,
-				midPrice,
-				spread,
-				snapshot.SnapshotAt,
 			}, nil
 		}),
 	)
 
 	return err
-}
-
-func calculateMidPriceAndSpread(bids, asks [][2]float64) (float64, float64) {
-	if len(bids) == 0 || len(asks) == 0 {
-		return 0, 0
-	}
-	bestBid := bids[0][0]
-	bestAsk := asks[0][0]
-	return (bestBid + bestAsk) / 2, bestAsk - bestBid
 }
 
 func convertToFloat64Array(raw interface{}) [][2]float64 {
