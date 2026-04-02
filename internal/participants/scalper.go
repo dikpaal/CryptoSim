@@ -16,6 +16,8 @@ type ScalperMM struct {
 	OrderSize         float64
 	NumLevels         int
 	LevelSpacing      float64
+	LastQuotedMid     float64
+	MinMoveThresh     float64
 	BidIDs            []string // slice of orderIDs
 	AskIDs            []string // slice of orderIDs
 }
@@ -25,8 +27,9 @@ func NewScalperMM(participantConfig ParticipantConfig, numLevels int) *ScalperMM
 		ParticipantConfig: participantConfig,
 		SpreadBps:         2.0,
 		OrderSize:         0.01,
-		NumLevels:         numLevels,
+		NumLevels:         numLevels, // default 3
 		LevelSpacing:      1.0,
+		MinMoveThresh:     0.05,
 		BidIDs:            make([]string, numLevels),
 		AskIDs:            make([]string, numLevels),
 	}
@@ -51,9 +54,12 @@ func (scalperMM *ScalperMM) handlePriceInflux(msg *nats.Msg) {
 		return
 	}
 
-	scalperMM.cancelAllOrders()
-
 	mid := priceTick.Mid
+	if abs(mid-scalperMM.LastQuotedMid) < scalperMM.MinMoveThresh {
+		return
+	}
+
+	scalperMM.cancelAllOrders()
 	halfSpread := mid * (scalperMM.SpreadBps / 2) * 0.0001
 	spacing := mid * scalperMM.LevelSpacing * 0.0001
 
@@ -65,6 +71,7 @@ func (scalperMM *ScalperMM) handlePriceInflux(msg *nats.Msg) {
 		scalperMM.BidIDs[i] = scalperMM.submitOrder(models.Bid, models.Limit, bidPrice, scalperMM.OrderSize)
 		scalperMM.AskIDs[i] = scalperMM.submitOrder(models.Ask, models.Limit, askPrice, scalperMM.OrderSize)
 	}
+	scalperMM.LastQuotedMid = mid
 }
 
 // -- NATS request-reply --
@@ -102,14 +109,14 @@ func (scalperMM *ScalperMM) submitOrder(side models.Side, orderType models.Order
 	return ack.OrderID
 }
 
-func (s *ScalperMM) cancelAllOrders() {
-	for i, id := range s.BidIDs {
-		s.cancelOrder(id)
-		s.BidIDs[i] = ""
+func (scalperMM *ScalperMM) cancelAllOrders() {
+	for i, id := range scalperMM.BidIDs {
+		scalperMM.cancelOrder(id)
+		scalperMM.BidIDs[i] = ""
 	}
-	for i, id := range s.AskIDs {
-		s.cancelOrder(id)
-		s.AskIDs[i] = ""
+	for i, id := range scalperMM.AskIDs {
+		scalperMM.cancelOrder(id)
+		scalperMM.AskIDs[i] = ""
 	}
 }
 
@@ -140,4 +147,11 @@ func (scalperMM *ScalperMM) cancelOrder(orderID string) {
 		fmt.Println("ERROR UNMARSHALING CANCEL ACK")
 		return
 	}
+}
+
+func abs(x float64) float64 {
+	if x < 0 {
+		return -x
+	}
+	return x
 }
