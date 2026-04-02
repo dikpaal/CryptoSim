@@ -16,8 +16,8 @@ type ScalperMM struct {
 	OrderSize         float64
 	NumLevels         int
 	LevelSpacing      float64
-	BidIDs            []string
-	AskIDs            []string
+	BidIDs            []string // slice of orderIDs
+	AskIDs            []string // slice of orderIDs
 }
 
 func NewScalperMM(participantConfig ParticipantConfig, numLevels int) *ScalperMM {
@@ -51,7 +51,7 @@ func (scalperMM *ScalperMM) handlePriceInflux(msg *nats.Msg) {
 		return
 	}
 
-	scalperMM.cancelAllOrders() // TODO: make a cancel req-reply channel between mm and engine
+	scalperMM.cancelAllOrders()
 
 	mid := priceTick.Mid
 	halfSpread := mid * (scalperMM.SpreadBps / 2) * 0.0001
@@ -62,7 +62,6 @@ func (scalperMM *ScalperMM) handlePriceInflux(msg *nats.Msg) {
 		bidPrice := mid - offset
 		askPrice := mid + offset
 
-		// TODO submitOrder returns the orderID (via the request-reply connection with engine)
 		scalperMM.BidIDs[i] = scalperMM.submitOrder(models.Bid, models.Limit, bidPrice, scalperMM.OrderSize)
 		scalperMM.AskIDs[i] = scalperMM.submitOrder(models.Ask, models.Limit, askPrice, scalperMM.OrderSize)
 	}
@@ -71,8 +70,6 @@ func (scalperMM *ScalperMM) handlePriceInflux(msg *nats.Msg) {
 // -- NATS request-reply --
 
 func (scalperMM *ScalperMM) submitOrder(side models.Side, orderType models.OrderType, price float64, quantity float64) string {
-	// returns the orderID
-	// TODO matching engine's handler just needs to unmarshal the order, process it, and call msg.Respond(ack).
 	order := models.Order{
 		ID:         uuid.New().String(),
 		Creator_ID: scalperMM.ParticipantConfig.ID,
