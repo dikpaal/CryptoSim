@@ -1,10 +1,16 @@
 package models
 
 const (
-	PricesLiveTopic   = "prices.live"
-	OrdersSubmitTopic = "orders.submit"
-	OrdersCancelTopic = "orders.cancel"
-	StatusTopic       = "participant.status"
+	PriceBTCTopic = "price.btc"
+	PriceXRPTopic = "price.xrp"
+	PriceETHTopic = "price.eth"
+)
+
+const (
+	OrderBookSnapshotTopic = "orderbook.snapshot"
+	OrdersSubmitTopic      = "orders.submit"
+	OrdersCancelTopic      = "orders.cancel"
+	StatusTopic            = "participant.status"
 )
 
 const (
