@@ -50,14 +50,6 @@ type Ticker struct {
 	BestAskQuantity    string `json:"best_ask_quantity"`
 }
 
-type PriceTick struct {
-	Symbol    string  `json:"symbol"`
-	Bid       float64 `json:"bid"`
-	Ask       float64 `json:"ask"`
-	Mid       float64 `json:"mid"`
-	Timestamp int64   `json:"timestamp"`
-}
-
 type PriceFeedService struct {
 	wsConn   *websocket.Conn
 	natsConn *NATSConn
@@ -71,25 +63,25 @@ func NewPriceFeedService(natsConn *NATSConn, symbols []string) *PriceFeedService
 	}
 }
 
-func (pfs *PriceFeedService) Start() error {
-	conn, _, err := pfs.dial("wss://advanced-trade-ws.coinbase.com")
+func (priceFeedService *PriceFeedService) Start() error {
+	conn, _, err := priceFeedService.dial(endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Coinbase: %w", err)
 	}
 
-	pfs.wsConn = conn
+	priceFeedService.wsConn = conn
 	log.Println("Connected to Coinbase WebSocket")
 
 	var productIDs []models.ProductId
 
-	for _, symbol := range pfs.symbols {
+	for _, symbol := range priceFeedService.symbols {
 		productIDs = append(productIDs, models.ProductId(symbol))
 	}
 
-	pfs.subscribe(conn, "subscribe", productIDs, models.Ticker)
-	log.Printf("Subscribed to ticker for %v", pfs.symbols)
+	priceFeedService.subscribe(conn, "subscribe", productIDs, models.Ticker)
+	log.Printf("Subscribed to ticker for %v", priceFeedService.symbols)
 
-	go pfs.startLivePricesPublisher()
+	go priceFeedService.startLivePricesPublishers()
 	return nil
 }
 
@@ -139,8 +131,8 @@ func (priceFeedService *PriceFeedService) ReconnectWithExponentialBackoff(numTri
 	log.Fatalln("Could not reconnect, stopping the sim!")
 }
 
-func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
-	priceTickChannel := make(chan PriceTick)
+func (priceFeedService *PriceFeedService) ReadMessages() <-chan models.PriceTick {
+	priceTickChannel := make(chan models.PriceTick)
 
 	go func() {
 		defer close(priceTickChannel)
@@ -173,7 +165,7 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
 					continue
 				}
 
-				priceTick := PriceTick{
+				priceTick := models.PriceTick{
 					Symbol:    ticker.ProductID,
 					Bid:       bid,
 					Ask:       ask,
@@ -189,11 +181,18 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan PriceTick {
 	return priceTickChannel
 }
 
-func (priceFeedService *PriceFeedService) startLivePricesPublisher() {
+func (priceFeedService *PriceFeedService) startLivePricesPublishers() {
 	readChannel := priceFeedService.ReadMessages()
 
 	for priceTick := range readChannel {
 		data, _ := json.Marshal(priceTick)
-		priceFeedService.natsConn.nc.Publish(PricesLiveTopic, data)
+
+		if models.ProductId(priceTick.Symbol) == models.BTC_USD {
+			priceFeedService.natsConn.nc.Publish(models.PriceBTCTopic, data)
+		} else if models.ProductId(priceTick.Symbol) == models.ETH_USD {
+			priceFeedService.natsConn.nc.Publish(models.PriceETHTopic, data)
+		} else if models.ProductId(priceTick.Symbol) == models.XRP_USD {
+			priceFeedService.natsConn.nc.Publish(models.PriceXRPTopic, data)
+		}
 	}
 }

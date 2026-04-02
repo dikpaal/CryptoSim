@@ -6,10 +6,6 @@ import (
 	"github.com/nats-io/nats.go"
 )
 
-const (
-	PricesLiveTopic = "prices.live"
-)
-
 type NATSConn struct {
 	nc *nats.Conn
 }
@@ -23,9 +19,9 @@ func NewNATSConn(url string) (*NATSConn, error) {
 	return &NATSConn{nc: nc}, nil
 }
 
-func (n *NATSConn) Close() {
-	if n.nc != nil {
-		n.nc.Close()
+func (nats *NATSConn) Close() {
+	if nats.nc != nil {
+		nats.nc.Close()
 		log.Println("NATS connection closed")
 	}
 }
