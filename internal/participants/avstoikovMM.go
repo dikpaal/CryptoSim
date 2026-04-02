@@ -42,10 +42,16 @@ func NewAvellanedaStoikovMM(participantConfig ParticipantConfig, numLevels int) 
 // -- NATS pubusb --
 
 func (avellanedaStoikovMM *AvellanedaStoikovMM) Start() error {
-	_, err := avellanedaStoikovMM.ParticipantConfig.NC.nc.Subscribe(models.PriceETHTopic, avellanedaStoikovMM.handlePriceInflux)
+	_, err := avellanedaStoikovMM.ParticipantConfig.NC.nc.Subscribe(models.PriceXRPTopic, avellanedaStoikovMM.handlePriceInflux)
 	if err != nil {
-		return fmt.Errorf("subscribe prices.ETH: %w", err)
+		return fmt.Errorf("subscribe prices.XRP: %w", err)
 	}
+
+	_, err2 := avellanedaStoikovMM.ParticipantConfig.NC.nc.Subscribe(models.OrderBookSnapshotTopic, avellanedaStoikovMM.handleOrderBookSnapshot)
+	if err2 != nil {
+		return fmt.Errorf("subscribe orderbook.snapshot: %w", err2)
+	}
+
 	return nil
 }
 
@@ -77,6 +83,29 @@ func (avellanedaStoikovMM *AvellanedaStoikovMM) handlePriceInflux(msg *nats.Msg)
 		avellanedaStoikovMM.BidIDs[i] = avellanedaStoikovMM.submitOrder(models.Bid, models.Limit, bidPrice, avellanedaStoikovMM.OrderSize)
 		avellanedaStoikovMM.AskIDs[i] = avellanedaStoikovMM.submitOrder(models.Ask, models.Limit, askPrice, avellanedaStoikovMM.OrderSize)
 	}
+}
+
+func (avellanedaStoikovMM *AvellanedaStoikovMM) handleOrderBookSnapshot(msg *nats.Msg) {
+	var snapshot models.OrderbookSnapshot
+	if err := json.Unmarshal(msg.Data, &snapshot); err != nil {
+		fmt.Println("ERROR UNMARSHALING ORDERBOOK SNAPSHOT")
+		return
+	}
+
+	if snapshot.Symbol != avellanedaStoikovMM.ParticipantConfig.Symbol {
+		return
+	}
+
+	if len(snapshot.Bids) == 0 || len(snapshot.Asks) == 0 {
+		return
+	}
+
+	bestBidVol := snapshot.Bids[0][1] // [price, quantity]
+	bestAskVol := snapshot.Asks[0][1]
+
+	avgVol := (bestBidVol + bestAskVol) / 2
+	avellanedaStoikovMM.Kappa = math.Log(1 + avgVol)
+
 }
 
 // -- NATS request-reply --
