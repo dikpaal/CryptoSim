@@ -163,6 +163,7 @@ func (orderBook *OrderBook) matchLimitOrder(order *models.Order) []*models.Trade
 }
 
 func (orderBook *OrderBook) addToBook(order *models.Order) {
+	order.Status = models.Pending
 	orderBook.orders[order.ID] = order
 
 	if order.Side == models.Ask {
