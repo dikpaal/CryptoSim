@@ -1,0 +1,264 @@
+version: '3.8'
+
+services:
+  nats:
+    image: nats:2.10-alpine
+    container_name: cryptosim-nats
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    command: ["-js", "-m", "8222"]
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8222/healthz"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+    networks:
+      - cryptosim
+
+  timescaledb:
+    image: timescale/timescaledb:latest-pg16
+    container_name: cryptosim-timescaledb
+    environment:
+      - POSTGRES_DB=cryptosim
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    ports:
+      - "6543:5432"
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
+    networks:
+      - cryptosim
+
+  persistence:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: persistence
+    container_name: cryptosim-persistence
+    environment:
+      - NATS_URL=nats://nats:4222
+      - DB_HOST=timescaledb
+      - DB_PORT=5432
+      - DB_NAME=cryptosim
+      - DB_USER=postgres
+      - DB_PASSWORD=password
+    depends_on:
+      nats:
+        condition: service_healthy
+      timescaledb:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  engine:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: engine
+    container_name: cryptosim-engine
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  price-feed:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: price-feed
+    container_name: cryptosim-price-feed
+    environment:
+      - NATS_URL=nats://nats:4222
+    depends_on:
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  scalper-mm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: scalper-mm
+    container_name: cryptosim-scalper-mm
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=scalper-mm-1
+      - SYMBOL=BTC-USD
+      - NUM_LEVELS=3
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  momentum-mm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: momentum-mm
+    container_name: cryptosim-momentum-mm
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=momentum-mm-1
+      - SYMBOL=ETH-USD
+      - NUM_LEVELS=3
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  avstoikov-mm:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: avstoikov-mm
+    container_name: cryptosim-avstoikov-mm
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=avstoikov-mm-1
+      - SYMBOL=XRP-USD
+      - NUM_LEVELS=3
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  momentum-trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: momentum-trader
+    container_name: cryptosim-momentum-trader
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=momentum-trader-1
+      - SYMBOL=ETH-USD
+      - WINDOW_SIZE=20
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  meanrev-trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: meanrev-trader
+    container_name: cryptosim-meanrev-trader
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=meanrev-trader-1
+      - SYMBOL=BTC-USD
+      - NUM_LEVELS=3
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  noise-trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: noise-trader
+    container_name: cryptosim-noise-trader
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=noise-trader-1
+      - SYMBOL=XRP-USD
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  vwap-trader:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: vwap-trader
+    container_name: cryptosim-vwap-trader
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=vwap-trader-1
+      - SYMBOL=BTC-USD
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  load-tester:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: load-tester
+    container_name: cryptosim-load-tester
+    environment:
+      - NATS_URL=nats://nats:4222
+      - NUM_WORKERS=50
+      - ORDERS_PER_SECOND=20000
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    profiles:
+      - testing
+    networks:
+      - cryptosim
+
+networks:
+  cryptosim:
+    driver: bridge
+
+volumes:
+  timescale_data:
