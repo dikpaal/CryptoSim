@@ -28,6 +28,7 @@ type LoadTester struct {
 	ordersAccepted  atomic.Uint64
 	ordersRejected  atomic.Uint64
 	tradesExecuted  atomic.Uint64
+	dbWrites        atomic.Uint64
 
 	latencies    []time.Duration
 	latencyMutex sync.Mutex
@@ -57,6 +58,17 @@ func (lt *LoadTester) Start() error {
 	})
 	if err != nil {
 		return fmt.Errorf("subscribe trades: %w", err)
+	}
+
+	// Subscribe to DB metrics
+	_, err = lt.nc.Subscribe(models.MetricsDBTopic, func(msg *nats.Msg) {
+		var metrics models.DBMetrics
+		if err := json.Unmarshal(msg.Data, &metrics); err == nil {
+			lt.dbWrites.Add(metrics.TotalWrites)
+		}
+	})
+	if err != nil {
+		return fmt.Errorf("subscribe db metrics: %w", err)
 	}
 
 	// Start workers
@@ -150,16 +162,19 @@ func (lt *LoadTester) reportStats() {
 	lastSubmitted := uint64(0)
 	lastAccepted := uint64(0)
 	lastTrades := uint64(0)
+	lastDBWrites := uint64(0)
 
 	for range ticker.C {
 		submitted := lt.ordersSubmitted.Load()
 		accepted := lt.ordersAccepted.Load()
 		rejected := lt.ordersRejected.Load()
 		trades := lt.tradesExecuted.Load()
+		dbWrites := lt.dbWrites.Load()
 
 		ordersPerSec := float64(submitted-lastSubmitted) / 5.0
 		acceptedPerSec := float64(accepted-lastAccepted) / 5.0
 		tradesPerSec := float64(trades-lastTrades) / 5.0
+		dbWritesPerSec := float64(dbWrites-lastDBWrites) / 5.0
 
 		lt.latencyMutex.Lock()
 		avgLatency := time.Duration(0)
@@ -173,12 +188,13 @@ func (lt *LoadTester) reportStats() {
 		}
 		lt.latencyMutex.Unlock()
 
-		log.Printf("Orders: %d submitted (%.0f/s), %d accepted (%.0f/s), %d rejected | Trades: %d (%.0f/s) | Avg Latency: %v",
-			submitted, ordersPerSec, accepted, acceptedPerSec, rejected, trades, tradesPerSec, avgLatency)
+		log.Printf("Orders: %d submitted (%.0f/s), %d accepted (%.0f/s), %d rejected | Trades: %d (%.0f/s) | DB writes: %d (%.0f/s) | Avg Latency: %v",
+			submitted, ordersPerSec, accepted, acceptedPerSec, rejected, trades, tradesPerSec, dbWrites, dbWritesPerSec, avgLatency)
 
 		lastSubmitted = submitted
 		lastAccepted = accepted
 		lastTrades = trades
+		lastDBWrites = dbWrites
 	}
 }
 

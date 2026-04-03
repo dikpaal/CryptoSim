@@ -12,6 +12,7 @@ const (
 	OrdersSubmitTopic      = "orders.submit"
 	OrdersCancelTopic      = "orders.cancel"
 	StatusTopic            = "participant.status"
+	MetricsDBTopic         = "metrics.db"
 )
 
 const (

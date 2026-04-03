@@ -156,12 +156,17 @@ func (tradesHandler *TradesHandler) writeTradesToDB(trades []models.Trade) error
 	if err == nil {
 		tradesHandler.writesCount += uint64(len(trades))
 
-		// Log writes/s every 5 seconds
+		// Publish metrics every 1 second
 		now := time.Now()
 		elapsed := now.Sub(tradesHandler.lastLogTime).Seconds()
-		if elapsed >= 5.0 {
-			writesPerSec := float64(tradesHandler.writesCount) / elapsed
-			log.Printf("DB writes: %d trades in %.1fs (%.1f writes/s)", tradesHandler.writesCount, elapsed, writesPerSec)
+		if elapsed >= 1.0 {
+			metrics := models.DBMetrics{
+				TradeWrites: tradesHandler.writesCount,
+				TotalWrites: tradesHandler.writesCount,
+			}
+			if data, err := json.Marshal(metrics); err == nil {
+				tradesHandler.n.nc.Publish(MetricsDBTopic, data)
+			}
 			tradesHandler.writesCount = 0
 			tradesHandler.lastLogTime = now
 		}

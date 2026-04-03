@@ -9,6 +9,7 @@ import (
 const (
 	TradesExecutedTopic    = "trades.executed"
 	OrderBookSnapshotTopic = "orderbook.snapshot"
+	MetricsDBTopic         = "metrics.db"
 )
 
 type NATSConn struct {

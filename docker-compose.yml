@@ -45,7 +45,7 @@ services:
     environment:
       - NATS_URL=nats://nats:4222
       - DB_HOST=timescaledb
-      - DB_PORT=6543
+      - DB_PORT=5432
       - DB_NAME=cryptosim
       - DB_USER=postgres
       - DB_PASSWORD=password
