@@ -102,17 +102,7 @@ func (engine *Engine) publishTrade(trade *models.Trade) {
 		return
 	}
 
-	var subject string
-
-	if trade.Symbol == string(models.BTC_USD) {
-		subject = models.PriceBTCTopic
-	} else if trade.Symbol == string(models.ETH_USD) {
-		subject = models.PriceETHTopic
-	} else if trade.Symbol == string(models.XRP_USD) {
-		subject = models.PriceXRPTopic
-	}
-
-	engine.nc.Publish(subject, data)
+	engine.nc.Publish(models.TradesExecutedTopic, data)
 
 }
 

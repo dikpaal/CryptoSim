@@ -7,6 +7,7 @@ const (
 )
 
 const (
+	TradesExecutedTopic    = "trades.executed"
 	OrderBookSnapshotTopic = "orderbook.snapshot"
 	OrdersSubmitTopic      = "orders.submit"
 	OrdersCancelTopic      = "orders.cancel"
