@@ -17,7 +17,7 @@ type MomentumT struct {
 	OrderSize         float64
 	Threshold         float64
 	ActiveOrderID     string
-	ProfitOrderID string
+	ProfitOrderID     string
 }
 
 func NewMomentumT(participantConfig ParticipantConfig, windowSize int) *MomentumT {
@@ -28,7 +28,7 @@ func NewMomentumT(participantConfig ParticipantConfig, windowSize int) *Momentum
 		OrderSize:         0.05,
 		Threshold:         0.002, // 0.2% price move to trigger
 		ActiveOrderID:     "",
-		ProfitOrderID: "",
+		ProfitOrderID:     "",
 	}
 }
 
@@ -65,7 +65,6 @@ func (momentumT *MomentumT) handlePriceInflux(msg *nats.Msg) {
 	momentumT.cancelOrder(momentumT.ProfitOrderID)
 	momentumT.ProfitOrderID = ""
 
-
 	mid := priceTick.Mid
 	targetProfit := mid * 0.002
 
@@ -83,8 +82,8 @@ func (momentumT *MomentumT) handlePriceInflux(msg *nats.Msg) {
 func (momentumT *MomentumT) submitOrder(side models.Side, orderType models.OrderType, price float64, quantity float64) string {
 	order := models.Order{
 		ID:         uuid.New().String(),
-		Creator_ID: scalperMM.ParticipantConfig.ID,
-		Symbol:     scalperMM.ParticipantConfig.Symbol,
+		Creator_ID: momentumT.ParticipantConfig.ID,
+		Symbol:     momentumT.ParticipantConfig.Symbol,
 		Side:       side,
 		OrderType:  orderType,
 		Price:      price,
@@ -98,7 +97,7 @@ func (momentumT *MomentumT) submitOrder(side models.Side, orderType models.Order
 		return ""
 	}
 
-	msg, err := scalperMM.ParticipantConfig.NC.nc.Request(models.OrdersSubmitTopic, data, 2*time.Second)
+	msg, err := momentumT.ParticipantConfig.NC.nc.Request(models.OrdersSubmitTopic, data, 2*time.Second)
 	if err != nil {
 		fmt.Println("ERROR SUBMITTING ORDER IN submitOrder in MOMENTUMT")
 		return ""
@@ -129,7 +128,7 @@ func (momentumT *MomentumT) cancelOrder(orderID string) {
 		return
 	}
 
-	msg, err := scalperMM.ParticipantConfig.NC.nc.Request(models.OrdersCancelTopic, data, 2*time.Second)
+	msg, err := momentumT.ParticipantConfig.NC.nc.Request(models.OrdersCancelTopic, data, 2*time.Second)
 	if err != nil {
 		fmt.Println("ERROR SENDING CANCEL REQUEST")
 		return
@@ -140,11 +139,4 @@ func (momentumT *MomentumT) cancelOrder(orderID string) {
 		fmt.Println("ERROR UNMARSHALING CANCEL ACK")
 		return
 	}
-}
-
-func abs(x float64) float64 {
-	if x < 0 {
-		return -x
-	}
-	return x
 }
