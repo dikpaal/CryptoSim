@@ -35,9 +35,9 @@ func NewMomentumT(participantConfig ParticipantConfig, windowSize int) *Momentum
 // -- NATS pubusb --
 
 func (momentumT *MomentumT) Start() error {
-	_, err := momentumT.ParticipantConfig.NC.nc.Subscribe(models.PriceBTCTopic, momentumT.handlePriceInflux)
+	_, err := momentumT.ParticipantConfig.NC.nc.Subscribe(models.PriceETHTopic, momentumT.handlePriceInflux)
 	if err != nil {
-		return fmt.Errorf("subscribe prices.BTC: %w", err)
+		return fmt.Errorf("subscribe prices.ETH: %w", err)
 	}
 	return nil
 }
