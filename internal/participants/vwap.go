@@ -175,4 +175,3 @@ func (t *VWAPTrader) cancelOrder(orderID string) {
 		return
 	}
 }
-
