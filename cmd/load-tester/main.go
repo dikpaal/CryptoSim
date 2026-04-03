@@ -29,8 +29,8 @@ type LoadTester struct {
 	ordersRejected  atomic.Uint64
 	tradesExecuted  atomic.Uint64
 
-	latencies       []time.Duration
-	latencyMutex    sync.Mutex
+	latencies    []time.Duration
+	latencyMutex sync.Mutex
 }
 
 func NewLoadTester(natsURL string, numWorkers, ordersPerSecond int) (*LoadTester, error) {
@@ -133,7 +133,6 @@ func (lt *LoadTester) submitRandomOrder() {
 		return
 	}
 
-	// Engine sends PENDING, PARTIAL, FILLED for success, "rejected" for errors
 	if ack.Status == "PENDING" || ack.Status == "PARTIAL" || ack.Status == "FILLED" {
 		lt.ordersAccepted.Add(1)
 		lt.latencyMutex.Lock()
