@@ -150,7 +150,7 @@ Parameters: `window=50`, `threshold=0.1%`, `orderSize=0.05 BTC`.
 
 ---
 
-## Section 3 — Persistence
+## Persistence
 
 Three TimescaleDB hypertables are created at startup via embedded SQL migrations:
 
