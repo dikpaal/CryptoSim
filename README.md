@@ -85,9 +85,9 @@ Implements the Avellaneda-Stoikov (2008) optimal market making model. The reserv
 
 $$r = m - q \gamma \sigma^2 T$$
 
-$$\delta^{*} = \gamma \sigma^2 T + \frac{2}{\gamma} \ln\!\left(1 + \frac{\gamma}{\kappa}\right)$$
+$$\delta^{\ast} = \gamma \sigma^2 T + \frac{2}{\gamma} \ln\!\left(1 + \frac{\gamma}{\kappa}\right)$$
 
-$$b^i = r - \frac{\delta^{*}}{2} - i\Delta, \quad a^i = r + \frac{\delta^{*}}{2} + i\Delta$$
+$$b^i = r - \frac{\delta^{\ast}}{2} - i\Delta, \quad a^i = r + \frac{\delta^{\ast}}{2} + i\Delta$$
 
 where $q$ = inventory, $\gamma$ = risk aversion, $\sigma$ = volatility, $T$ = time horizon, $\kappa$ = order arrival intensity.
 
