@@ -54,9 +54,10 @@ func (h *OrderbookSnapshotHandler) Subscribe() {
 		h.mu.Unlock()
 
 		snapshot := models.OrderbookSnapshot{
-			Symbol: raw["symbol"].(string),
-			Bids:   convertToFloat64Array(raw["bids"]),
-			Asks:   convertToFloat64Array(raw["asks"]),
+			Symbol:     raw["symbol"].(string),
+			Bids:       convertToFloat64Array(raw["bids"]),
+			Asks:       convertToFloat64Array(raw["asks"]),
+			SnapshotAt: time.Now(),
 		}
 
 		h.snapshotChan <- snapshot
@@ -123,7 +124,7 @@ func (h *OrderbookSnapshotHandler) writeSnapshotsToDb(snapshots []models.Orderbo
 	_, err := h.db.CopyFrom(
 		ctx,
 		pgx.Identifier{"orderbook_snapshots"},
-		[]string{"symbol", "bids", "asks"},
+		[]string{"symbol", "bids", "asks", "snapshot_at"},
 		pgx.CopyFromSlice(len(snapshots), func(i int) ([]any, error) {
 			snapshot := snapshots[i]
 			bidsJSON, _ := json.Marshal(snapshot.Bids)
@@ -133,6 +134,7 @@ func (h *OrderbookSnapshotHandler) writeSnapshotsToDb(snapshots []models.Orderbo
 				snapshot.Symbol,
 				bidsJSON,
 				asksJSON,
+				snapshot.SnapshotAt,
 			}, nil
 		}),
 	)

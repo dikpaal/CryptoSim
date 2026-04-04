@@ -9,10 +9,20 @@ import (
 	"syscall"
 	"time"
 
+	"cryptosim/migrations"
 	"cryptosim/persistence"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
+
+func runMigrations(ctx context.Context, db *pgxpool.Pool) error {
+	for _, sql := range migrations.All {
+		if _, err := db.Exec(ctx, sql); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
 func main() {
 	natsURL := getEnv("NATS_URL", "nats://localhost:4222")
@@ -43,6 +53,11 @@ func main() {
 	defer db.Close()
 
 	log.Println("Connected to TimescaleDB")
+
+	if err := runMigrations(context.Background(), db); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+	log.Println("Migrations applied")
 
 	tradesHandler, err := persistence.NewTradesHandler(natsURL, db)
 	if err != nil {

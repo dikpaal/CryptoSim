@@ -11,4 +11,4 @@ CREATE TABLE IF NOT EXISTS trades (
       PRIMARY KEY (trade_id, executed_at)
   );
 
-  SELECT create_hypertable('trades', 'executed_at');
+  SELECT create_hypertable('trades', 'executed_at', if_not_exists => TRUE);

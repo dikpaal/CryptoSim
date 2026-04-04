@@ -8,6 +8,6 @@ CREATE TABLE IF NOT EXISTS orderbook_snapshots (
       snapshot_at TIMESTAMPTZ NOT NULL
   );
 
-  SELECT create_hypertable('orderbook_snapshots', 'snapshot_at');
+  SELECT create_hypertable('orderbook_snapshots', 'snapshot_at', if_not_exists => TRUE);
 
   CREATE INDEX ON orderbook_snapshots (symbol, snapshot_at DESC);

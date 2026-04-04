@@ -9,6 +9,6 @@ CREATE TABLE IF NOT EXISTS mm_status (
       recorded_at     TIMESTAMPTZ NOT NULL
   );
 
-  SELECT create_hypertable('mm_status', 'recorded_at');
+  SELECT create_hypertable('mm_status', 'recorded_at', if_not_exists => TRUE);
 
   CREATE INDEX ON mm_status (mm_id, recorded_at DESC);
