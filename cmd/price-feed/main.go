@@ -19,7 +19,10 @@ func main() {
 	defer natsConn.Close()
 	log.Printf("Connected to NATS at %s", natsURL)
 
-	pfs := pricefeed.NewPriceFeedService(natsConn, symbols)
+	keyName := getEnv("COINBASE_KEY_NAME", "")
+	keySecret := getEnv("COINBASE_KEY_SECRET", "")
+
+	pfs := pricefeed.NewPriceFeedService(natsConn, symbols, keyName, keySecret)
 	if err := pfs.Start(); err != nil {
 		log.Fatalf("Failed to start price feed service: %v", err)
 	}

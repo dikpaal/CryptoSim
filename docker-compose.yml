@@ -83,6 +83,8 @@ services:
     container_name: cryptosim-price-feed
     environment:
       - NATS_URL=nats://nats:4222
+      - COINBASE_KEY_NAME=${COINBASE_KEY_NAME}
+      - COINBASE_KEY_SECRET=${COINBASE_KEY_SECRET}
     depends_on:
       nats:
         condition: service_healthy
@@ -99,7 +101,7 @@ services:
     container_name: cryptosim-scalper-mm
     environment:
       - NATS_URL=nats://nats:4222
-      - PARTICIPANT_ID=scalper-mm-1
+      - PARTICIPANT_ID=scalper-mm
       - SYMBOL=BTC-USD
       - NUM_LEVELS=3
     depends_on:
@@ -120,7 +122,7 @@ services:
     container_name: cryptosim-momentum-mm
     environment:
       - NATS_URL=nats://nats:4222
-      - PARTICIPANT_ID=momentum-mm-1
+      - PARTICIPANT_ID=momentum-mm
       - SYMBOL=ETH-USD
       - NUM_LEVELS=3
     depends_on:
@@ -141,7 +143,7 @@ services:
     container_name: cryptosim-avstoikov-mm
     environment:
       - NATS_URL=nats://nats:4222
-      - PARTICIPANT_ID=avstoikov-mm-1
+      - PARTICIPANT_ID=avstoikov-mm
       - SYMBOL=XRP-USD
       - NUM_LEVELS=3
     depends_on:
@@ -162,7 +164,7 @@ services:
     container_name: cryptosim-momentum-trader
     environment:
       - NATS_URL=nats://nats:4222
-      - PARTICIPANT_ID=momentum-trader-1
+      - PARTICIPANT_ID=momentum-trader
       - SYMBOL=ETH-USD
       - WINDOW_SIZE=20
     depends_on:
@@ -183,7 +185,7 @@ services:
     container_name: cryptosim-meanrev-trader
     environment:
       - NATS_URL=nats://nats:4222
-      - PARTICIPANT_ID=meanrev-trader-1
+      - PARTICIPANT_ID=meanrev-trader
       - SYMBOL=BTC-USD
       - NUM_LEVELS=3
     depends_on:
@@ -204,8 +206,48 @@ services:
     container_name: cryptosim-noise-trader
     environment:
       - NATS_URL=nats://nats:4222
-      - PARTICIPANT_ID=noise-trader-1
+      - PARTICIPANT_ID=noise-trader-xrp
       - SYMBOL=XRP-USD
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  noise-trader-btc:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: noise-trader
+    container_name: cryptosim-noise-trader-btc
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=noise-trader-btc
+      - SYMBOL=BTC-USD
+    depends_on:
+      nats:
+        condition: service_healthy
+      engine:
+        condition: service_started
+    restart: unless-stopped
+    networks:
+      - cryptosim
+
+  noise-trader-eth:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BUILD_TARGET: noise-trader
+    container_name: cryptosim-noise-trader-eth
+    environment:
+      - NATS_URL=nats://nats:4222
+      - PARTICIPANT_ID=noise-trader-eth
+      - SYMBOL=ETH-USD
     depends_on:
       nats:
         condition: service_healthy
@@ -224,7 +266,7 @@ services:
     container_name: cryptosim-vwap-trader
     environment:
       - NATS_URL=nats://nats:4222
-      - PARTICIPANT_ID=vwap-trader-1
+      - PARTICIPANT_ID=vwap-trader
       - SYMBOL=BTC-USD
     depends_on:
       nats:

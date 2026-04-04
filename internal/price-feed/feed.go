@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/coinbase/cdp-sdk/go/auth"
 	"github.com/gorilla/websocket"
 )
 
@@ -19,6 +20,7 @@ type PriceFeedRequest struct {
 	Type       string   `json:"type"`
 	ProductIds []string `json:"product_ids"`
 	Channel    string   `json:"channel"`
+	JWT        string   `json:"jwt,omitempty"`
 }
 
 type TickerResponse struct {
@@ -51,87 +53,115 @@ type Ticker struct {
 }
 
 type PriceFeedService struct {
-	wsConn   *websocket.Conn
-	natsConn *NATSConn
-	symbols  []string
+	wsConn    *websocket.Conn
+	natsConn  *NATSConn
+	symbols   []string
+	keyName   string
+	keySecret string
 }
 
-func NewPriceFeedService(natsConn *NATSConn, symbols []string) *PriceFeedService {
+func NewPriceFeedService(natsConn *NATSConn, symbols []string, keyName, keySecret string) *PriceFeedService {
 	return &PriceFeedService{
-		natsConn: natsConn,
-		symbols:  symbols,
+		natsConn:  natsConn,
+		symbols:   symbols,
+		keyName:   keyName,
+		keySecret: keySecret,
 	}
 }
 
-func (priceFeedService *PriceFeedService) Start() error {
-	conn, _, err := priceFeedService.dial(endpoint)
+func (pfs *PriceFeedService) generateJWT() string {
+	if pfs.keyName == "" || pfs.keySecret == "" {
+		return ""
+	}
+	jwt, err := auth.GenerateJWT(auth.JwtOptions{
+		KeyID:     pfs.keyName,
+		KeySecret: pfs.keySecret,
+		ExpiresIn: 120,
+	})
+	if err != nil {
+		log.Printf("JWT generation failed: %v", err)
+		return ""
+	}
+	return jwt
+}
+
+func (pfs *PriceFeedService) Start() error {
+	conn, _, err := pfs.dial(endpoint)
 	if err != nil {
 		return fmt.Errorf("failed to connect to Coinbase: %w", err)
 	}
 
-	priceFeedService.wsConn = conn
+	pfs.wsConn = conn
 	log.Println("Connected to Coinbase WebSocket")
 
 	var productIDs []models.ProductId
-
-	for _, symbol := range priceFeedService.symbols {
+	for _, symbol := range pfs.symbols {
 		productIDs = append(productIDs, models.ProductId(symbol))
 	}
 
-	priceFeedService.subscribe(conn, "subscribe", productIDs, models.Ticker)
-	log.Printf("Subscribed to ticker for %v", priceFeedService.symbols)
+	pfs.subscribe(conn, "subscribe", productIDs, models.Ticker, pfs.generateJWT())
+	log.Printf("Subscribed to ticker for %v", pfs.symbols)
 
-	go priceFeedService.startLivePricesPublishers()
+	// Refresh JWT and resubscribe before the 2-minute expiry.
+	if pfs.keyName != "" {
+		go func() {
+			ticker := time.NewTicker(110 * time.Second)
+			defer ticker.Stop()
+			for range ticker.C {
+				pfs.subscribe(pfs.wsConn, "subscribe", productIDs, models.Ticker, pfs.generateJWT())
+				log.Println("JWT refreshed, resubscribed to ticker")
+			}
+		}()
+	}
+
+	go pfs.startLivePricesPublishers()
 	return nil
 }
 
-func (priceFeedService *PriceFeedService) dial(endpoint string) (*websocket.Conn, *http.Response, error) {
+func (pfs *PriceFeedService) dial(endpoint string) (*websocket.Conn, *http.Response, error) {
 	conn, httpResponse, err := websocket.DefaultDialer.Dial(endpoint, nil)
 	if err != nil {
-		fmt.Println("ERROR: ", err)
+		fmt.Println("ERROR:", err)
 	}
-
 	return conn, httpResponse, err
 }
 
-func (priceFeedService *PriceFeedService) subscribe(conn *websocket.Conn, request_type models.WSRequestType, productIds []models.ProductId, channel models.Channel) {
-
-	string_ids := make([]string, len(productIds))
+func (pfs *PriceFeedService) subscribe(conn *websocket.Conn, requestType models.WSRequestType, productIds []models.ProductId, channel models.Channel, jwt string) {
+	stringIDs := make([]string, len(productIds))
 	for i, id := range productIds {
-		string_ids[i] = string(id)
+		stringIDs[i] = string(id)
 	}
 
-	subscribeMsg := PriceFeedRequest{
-		Type:       string(request_type),
-		ProductIds: string_ids,
+	msg := PriceFeedRequest{
+		Type:       string(requestType),
+		ProductIds: stringIDs,
 		Channel:    string(channel),
+		JWT:        jwt,
 	}
-	err := conn.WriteJSON(subscribeMsg)
-
-	if err != nil {
-		fmt.Println("ERROR WHILE SUBSCRIBING: ", err)
+	if err := conn.WriteJSON(msg); err != nil {
+		fmt.Println("ERROR WHILE SUBSCRIBING:", err)
 	}
 }
 
-func (priceFeedService *PriceFeedService) ReconnectWithExponentialBackoff(numTries int) {
-
-	priceFeedService.wsConn.Close()
+func (pfs *PriceFeedService) ReconnectWithExponentialBackoff(numTries int) {
+	pfs.wsConn.Close()
 
 	for count := 1; count <= numTries; count++ {
 		backoffDelay := time.Duration(math.Pow(2, float64(count))) * time.Second
-		fmt.Println("CONNECTION FAILED.. RECONNECT ATTEMPT ", count, " BACKOFF DELAY: ", backoffDelay)
+		fmt.Println("CONNECTION FAILED.. RECONNECT ATTEMPT", count, "BACKOFF DELAY:", backoffDelay)
 		time.Sleep(backoffDelay)
 
-		conn, _, err := priceFeedService.dial(endpoint)
+		conn, _, err := pfs.dial(endpoint)
 		if err == nil {
-			priceFeedService.wsConn = conn
-			priceFeedService.subscribe(conn, "subscribe", []models.ProductId{models.BTC_USD, models.XRP_USD, models.ETH_USD}, models.Ticker)
+			pfs.wsConn = conn
+			pfs.subscribe(conn, "subscribe", []models.ProductId{models.BTC_USD, models.XRP_USD, models.ETH_USD}, models.Ticker, pfs.generateJWT())
+			return
 		}
 	}
 	log.Fatalln("Could not reconnect, stopping the sim!")
 }
 
-func (priceFeedService *PriceFeedService) ReadMessages() <-chan models.PriceTick {
+func (pfs *PriceFeedService) ReadMessages() <-chan models.PriceTick {
 	priceTickChannel := make(chan models.PriceTick)
 
 	go func() {
@@ -139,15 +169,13 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan models.PriceTick
 
 		for {
 			var tickerResponse TickerResponse
-			fmt.Println("TICKER REPONSE: ", tickerResponse)
-			err := priceFeedService.wsConn.ReadJSON(&tickerResponse)
+			err := pfs.wsConn.ReadJSON(&tickerResponse)
 			if err != nil {
 				fmt.Println("PRICE FEED JSON read error. RECONNECTING:", err)
-				priceFeedService.ReconnectWithExponentialBackoff(3)
+				pfs.ReconnectWithExponentialBackoff(3)
 				continue
 			}
 
-			// Skip empty events or subscription confirmations
 			if len(tickerResponse.Events) == 0 || len(tickerResponse.Events[0].Tickers) == 0 {
 				continue
 			}
@@ -155,25 +183,20 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan models.PriceTick
 			for _, ticker := range tickerResponse.Events[0].Tickers {
 				bid, err := strconv.ParseFloat(ticker.BestBid, 64)
 				if err != nil {
-					fmt.Println("ERROR IN READING BID:", err)
 					continue
 				}
-
 				ask, err := strconv.ParseFloat(ticker.BestAsk, 64)
 				if err != nil {
-					fmt.Println("ERROR IN READING ASK:", err)
 					continue
 				}
 
-				priceTick := models.PriceTick{
+				priceTickChannel <- models.PriceTick{
 					Symbol:    ticker.ProductID,
 					Bid:       bid,
 					Ask:       ask,
 					Mid:       (bid + ask) / 2,
 					Timestamp: time.Now().Unix(),
 				}
-
-				priceTickChannel <- priceTick
 			}
 		}
 	}()
@@ -181,18 +204,16 @@ func (priceFeedService *PriceFeedService) ReadMessages() <-chan models.PriceTick
 	return priceTickChannel
 }
 
-func (priceFeedService *PriceFeedService) startLivePricesPublishers() {
-	readChannel := priceFeedService.ReadMessages()
-
-	for priceTick := range readChannel {
+func (pfs *PriceFeedService) startLivePricesPublishers() {
+	for priceTick := range pfs.ReadMessages() {
 		data, _ := json.Marshal(priceTick)
-
-		if models.ProductId(priceTick.Symbol) == models.BTC_USD {
-			priceFeedService.natsConn.nc.Publish(models.PriceBTCTopic, data)
-		} else if models.ProductId(priceTick.Symbol) == models.ETH_USD {
-			priceFeedService.natsConn.nc.Publish(models.PriceETHTopic, data)
-		} else if models.ProductId(priceTick.Symbol) == models.XRP_USD {
-			priceFeedService.natsConn.nc.Publish(models.PriceXRPTopic, data)
+		switch models.ProductId(priceTick.Symbol) {
+		case models.BTC_USD:
+			pfs.natsConn.nc.Publish(models.PriceBTCTopic, data)
+		case models.ETH_USD:
+			pfs.natsConn.nc.Publish(models.PriceETHTopic, data)
+		case models.XRP_USD:
+			pfs.natsConn.nc.Publish(models.PriceXRPTopic, data)
 		}
 	}
 }

@@ -107,7 +107,7 @@ func (engine *Engine) publishTrade(trade *models.Trade) {
 }
 
 func (engine *Engine) publishSnapshot(orderbook *OrderBook) {
-	asks, bids := orderbook.GetSnapshot(10)
+	asks, bids := orderbook.GetSnapshot(30)
 	snapshot := models.OrderbookSnapshot{
 		Symbol: orderbook.symbol,
 		Bids:   bids,

@@ -49,7 +49,7 @@ func (momentumT *MomentumT) handlePriceInflux(msg *nats.Msg) {
 		return
 	}
 
-	momentumT.PriceWindow = append(momentumT.PriceWindow, priceTick.Price)
+	momentumT.PriceWindow = append(momentumT.PriceWindow, priceTick.Mid)
 	if len(momentumT.PriceWindow) > momentumT.WindowSize {
 		momentumT.PriceWindow = momentumT.PriceWindow[1:]
 	}

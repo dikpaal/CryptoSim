@@ -34,9 +34,10 @@ func NewNoiseTrader(participantConfig ParticipantConfig) *NoiseTrader {
 // -- NATS pubusb --
 
 func (noiseT *NoiseTrader) Start() error {
-	_, err := noiseT.ParticipantConfig.NC.nc.Subscribe(models.PriceXRPTopic, noiseT.handlePriceInflux)
+	topic := models.PriceTopicForSymbol(noiseT.ParticipantConfig.Symbol)
+	_, err := noiseT.ParticipantConfig.NC.nc.Subscribe(topic, noiseT.handlePriceInflux)
 	if err != nil {
-		return fmt.Errorf("subscribe prices.XRP: %w", err)
+		return fmt.Errorf("subscribe %s: %w", topic, err)
 	}
 	go noiseT.run()
 	return nil
