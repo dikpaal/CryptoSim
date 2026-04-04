@@ -20,7 +20,7 @@ A crypto exchange simulator in Go. Runs a live order matching engine anchored to
 
 ## Stack
 
-| Layer | Technology |
+| Layer | Used |
 |---|---|
 | Engine & participants | Go |
 | Service Communication | NATS (pub/sub + request-reply) |
