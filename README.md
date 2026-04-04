@@ -4,6 +4,8 @@ A crypto exchange simulator in Go. Runs a live order matching engine anchored to
 
 <img width="2520" height="2171" alt="CryptoSim" src="https://github.com/user-attachments/assets/b86114c2-bd37-4362-b547-4463a3ecdf77" />
 
+![demo](https://github.com/user-attachments/assets/d64979b5-7727-4218-8c32-d65311d6b07b)
+
 ---
 
 ## Load Testing Results
