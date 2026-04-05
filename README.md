@@ -23,13 +23,11 @@ A crypto exchange simulator in Go. Runs a live order matching engine anchored to
 
 ## Stack
 
-| Layer | Used |
-|---|---|
-| Engine & participants | Go |
-| Service Communication | NATS (pub/sub + request-reply) |
-| Price feed | Coinbase Advanced Trade API (WebSocket) |
-| Persistence | TimescaleDB (PostgreSQL) |
-| Infrastructure | Docker |
+- Go
+- NATS (pub/sub + request-reply)
+- Coinbase Advanced Trade API (WebSocket)
+- PostgreSQL (TimescaleDB)
+- Docker
 
 ---
 
