@@ -4,6 +4,16 @@ A crypto exchange simulator in Go. Runs a live order matching engine anchored to
 
 ---
 
+## Stack
+
+- Go
+- NATS (pub/sub + request-reply)
+- Coinbase Advanced Trade API (WebSocket)
+- PostgreSQL (TimescaleDB)
+- Docker
+
+---
+
 <img width="2520" height="2171" alt="CryptoSim(1)" src="https://github.com/user-attachments/assets/076d7fa4-4f87-4740-bc73-820df02c53e5" />
 ![cryptosim](assets/demo.gif)
 
@@ -25,16 +35,6 @@ A crypto exchange simulator in Go. Runs a live order matching engine anchored to
 | Average order latency | 1.2ms |
 | Rejections | 0 |
 | DB write throughput | 57,000+ writes/s |
-
----
-
-## Stack
-
-- Go
-- NATS (pub/sub + request-reply)
-- Coinbase Advanced Trade API (WebSocket)
-- PostgreSQL (TimescaleDB)
-- Docker
 
 ---
 
