@@ -3,6 +3,9 @@ module cryptosim
 go 1.25.0
 
 require (
+	github.com/charmbracelet/bubbletea v1.3.10
+	github.com/charmbracelet/lipgloss v1.1.0
+	github.com/coinbase/cdp-sdk/go v0.0.0-20260331040605-21512f9406af
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/websocket v1.5.3
 	github.com/jackc/pgx/v5 v5.9.1
@@ -10,15 +13,11 @@ require (
 )
 
 require (
-	github.com/apapsch/go-jsonmerge/v2 v2.0.0 // indirect
 	github.com/aymanbagabas/go-osc52/v2 v2.0.1 // indirect
-	github.com/charmbracelet/bubbletea v1.3.10 // indirect
 	github.com/charmbracelet/colorprofile v0.2.3-0.20250311203215-f60798e515dc // indirect
-	github.com/charmbracelet/lipgloss v1.1.0 // indirect
 	github.com/charmbracelet/x/ansi v0.10.1 // indirect
 	github.com/charmbracelet/x/cellbuf v0.0.13-0.20250311204145-2c3ea96c31dd // indirect
 	github.com/charmbracelet/x/term v0.2.1 // indirect
-	github.com/coinbase/cdp-sdk/go v0.0.0-20260331040605-21512f9406af // indirect
 	github.com/erikgeiser/coninput v0.0.0-20211004153227-1c3628e74d0f // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.2 // indirect
 	github.com/jackc/pgpassfile v1.0.0 // indirect
@@ -34,7 +33,6 @@ require (
 	github.com/muesli/termenv v0.16.0 // indirect
 	github.com/nats-io/nkeys v0.4.7 // indirect
 	github.com/nats-io/nuid v1.0.1 // indirect
-	github.com/oapi-codegen/runtime v1.1.1 // indirect
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/xo/terminfo v0.0.0-20220910002029-abceb7e1c41e // indirect
 	golang.org/x/crypto v0.18.0 // indirect
