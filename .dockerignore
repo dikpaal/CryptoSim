@@ -2,8 +2,6 @@
 .gitignore
 *.md
 README.md
-PRD.md
-ROADMAP.md
 .DS_Store
 .env
 .env.*
