@@ -1,6 +1,6 @@
 # CryptoSim
 
-A crypto exchange simulator in Go. Runs a live order matching engine anchored to real Coinbase prices, with competing autonomous market maker and trader agents communicating over NATS.
+A crypto exchange simulator in Go. Runs a live order matching engine anchored to real Coinbase prices, with competing autonomous market maker and trader agents communicating over NATS. Also persists trades and orderbook snapshots to PostreSQL database (with backpressure handling)
 
 ---
 
