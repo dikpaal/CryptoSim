@@ -15,10 +15,6 @@ A crypto exchange simulator in Go. Runs a live order matching engine anchored to
 - Docker
 
 ---
-
-<img width="2520" height="2171" alt="CryptoSim(1)" src="https://github.com/user-attachments/assets/076d7fa4-4f87-4740-bc73-820df02c53e5" />
-![cryptosim](assets/demo.gif)
-
 <img width="1070" height="930" alt="Screenshot 2026-04-05 at 06 55 20" src="https://github.com/user-attachments/assets/9345a738-d682-471c-877e-7ad0df8e11f3" />
 <img width="1066" height="925" alt="Screenshot 2026-04-05 at 06 55 45" src="https://github.com/user-attachments/assets/83b3311e-22c2-4a29-adb9-463b8d4257c7" />
 <img width="1067" height="926" alt="Screenshot 2026-04-05 at 06 56 10" src="https://github.com/user-attachments/assets/a92bf841-2283-40c2-bf6f-fb745ddf32a7" />
