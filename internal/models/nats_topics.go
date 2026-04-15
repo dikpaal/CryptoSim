@@ -29,11 +29,5 @@ const (
 )
 
 const (
-	ScalperTradeExecutedTopic        = "mm1.tradeexecuted"
-	MomentumTradeExecutedTopic       = "mm2.tradeexecuted"
-	AvstoikovTradeExecutedTopic      = "mm3.tradeexecuted"
-	MomentumChaserTradeExecutedTopic = "t1.tradeexecuted"
-	MeanReversionTradeExecutedTopic  = "t2.tradeexecuted"
-	NoiseTradeExecutedTopic          = "t3.tradeexecuted"
-	VWAPTradeExecutedTopic           = "t4.tradeexecuted"
+	TradeExecutedReqReplytopic = "trades.executedreqreply"
 )
