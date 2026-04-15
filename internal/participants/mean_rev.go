@@ -41,6 +41,11 @@ func (meanReversionT *MeanReversionTrader) Start() error {
 	if err != nil {
 		return fmt.Errorf("subscribe prices.ETH: %w", err)
 	}
+
+	_, err3 := meanReversionT.ParticipantConfig.NC.nc.Subscribe(string(models.MeanReversionTradeExecutedTopic), meanReversionT.handleTradeReqReply)
+	if err3 != nil {
+		return fmt.Errorf("subscribe trade executed req reply: %w", err3)
+	}
 	return nil
 }
 
@@ -85,6 +90,30 @@ func (meanReversionT *MeanReversionTrader) buildLadders(mid float64) {
 }
 
 // -- NATS request-reply --
+
+func (meanReversionT *MeanReversionTrader) handleTradeReqReply(msg *nats.Msg) {
+	var trade models.Trade
+	err := json.Unmarshal(msg.Data, &trade)
+	if err != nil {
+		meanReversionT.replyError(msg, "invalid trade payload")
+		return
+	}
+
+	ack := models.TradeAck{
+		TradeID: trade.TradeID,
+	}
+
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
+
+func (meanReversionT *MeanReversionTrader) replyError(msg *nats.Msg, reason string) {
+	ack := models.TradeAck{
+		Reason: reason,
+	}
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
 
 func (meanReversionT *MeanReversionTrader) submitOrder(side models.Side, orderType models.OrderType, price float64, quantity float64) string {
 	order := models.Order{

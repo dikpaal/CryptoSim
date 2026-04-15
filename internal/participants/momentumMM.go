@@ -43,6 +43,12 @@ func (momentumMM *MomentumMM) Start() error {
 	if err != nil {
 		return fmt.Errorf("subscribe prices.ETH: %w", err)
 	}
+
+	_, err3 := momentumMM.ParticipantConfig.NC.nc.Subscribe(string(models.MomentumTradeExecutedTopic), momentumMM.handleTradeReqReply)
+	if err3 != nil {
+		return fmt.Errorf("subscribe trade executed req reply: %w", err3)
+	}
+
 	return nil
 }
 
@@ -82,6 +88,30 @@ func (momentumMM *MomentumMM) handlePriceInflux(msg *nats.Msg) {
 }
 
 // -- NATS request-reply --
+
+func (momentumMM *MomentumMM) handleTradeReqReply(msg *nats.Msg) {
+	var trade models.Trade
+	err := json.Unmarshal(msg.Data, &trade)
+	if err != nil {
+		momentumMM.replyError(msg, "invalid trade payload")
+		return
+	}
+
+	ack := models.TradeAck{
+		TradeID: trade.TradeID,
+	}
+
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
+
+func (momentumMM *MomentumMM) replyError(msg *nats.Msg, reason string) {
+	ack := models.TradeAck{
+		Reason: reason,
+	}
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
 
 func (momentumMM *MomentumMM) submitOrder(side models.Side, orderType models.OrderType, price float64, quantity float64) string {
 	order := models.Order{

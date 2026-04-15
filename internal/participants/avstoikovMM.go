@@ -52,6 +52,11 @@ func (avellanedaStoikovMM *AvellanedaStoikovMM) Start() error {
 		return fmt.Errorf("subscribe orderbook.snapshot: %w", err2)
 	}
 
+	_, err3 := avellanedaStoikovMM.ParticipantConfig.NC.nc.Subscribe(string(models.AvstoikovTradeExecutedTopic), avellanedaStoikovMM.handleTradeReqReply)
+	if err3 != nil {
+		return fmt.Errorf("subscribe trade executed req reply: %w", err3)
+	}
+
 	return nil
 }
 
@@ -109,6 +114,30 @@ func (avellanedaStoikovMM *AvellanedaStoikovMM) handleOrderBookSnapshot(msg *nat
 }
 
 // -- NATS request-reply --
+
+func (avellanedaStoikovMM *AvellanedaStoikovMM) handleTradeReqReply(msg *nats.Msg) {
+	var trade models.Trade
+	err := json.Unmarshal(msg.Data, &trade)
+	if err != nil {
+		avellanedaStoikovMM.replyError(msg, "invalid trade payload")
+		return
+	}
+
+	ack := models.TradeAck{
+		TradeID: trade.TradeID,
+	}
+
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
+
+func (avellanedaStoikovMM *AvellanedaStoikovMM) replyError(msg *nats.Msg, reason string) {
+	ack := models.TradeAck{
+		Reason: reason,
+	}
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
 
 func (avellanedaStoikovMM *AvellanedaStoikovMM) submitOrder(side models.Side, orderType models.OrderType, price float64, quantity float64) string {
 	order := models.Order{

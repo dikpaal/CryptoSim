@@ -4,6 +4,7 @@ import (
 	"cryptosim/internal/models"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/nats-io/nats.go"
 )
@@ -57,6 +58,7 @@ func (engine *Engine) handleSubmitOrder(msg *nats.Msg) {
 	trades := orderbook.SubmitOrder(&order)
 
 	for _, trade := range trades {
+		engine.relayTradeExecutionToParticipant(trade)
 		engine.publishTrade(trade)
 	}
 
@@ -69,6 +71,45 @@ func (engine *Engine) handleSubmitOrder(msg *nats.Msg) {
 
 	data, _ := json.Marshal(ack)
 	msg.Respond(data)
+}
+
+func (engine *Engine) relayTradeExecutionToParticipant(trade *models.Trade) {
+	data, err := json.Marshal(trade)
+	if err != nil {
+		fmt.Println("COULD NOT PUBLISH TRADE IN relayTradeExecutionToParticipant")
+		return
+	}
+
+	var topic models.IndividualTradeTopic
+	participant := trade.BuyerID
+	switch participant {
+	case "avstoikov-mm-1":
+		topic = models.AvstoikovTradeExecutedTopic
+	case "meanrev-trader-1":
+		topic = models.MeanReversionTradeExecutedTopic
+	case "momentum-mm-1":
+		topic = models.MomentumTradeExecutedTopic
+	case "momentum-trader-1":
+		topic = models.MomentumChaserTradeExecutedTopic
+	case "noise-trader-1":
+		topic = models.NoiseTradeExecutedTopic
+	case "scalper-mm-1":
+		topic = models.ScalperTradeExecutedTopic
+	default:
+		topic = models.VWAPTradeExecutedTopic
+	}
+
+	msg, err := engine.nc.Request(string(topic), data, 2*time.Second)
+	if err != nil {
+		fmt.Println("ERROR UPDATING PARTICIPANT ABOUT THEIR TRADE IN relayTradeExecutionToParticipant")
+		return
+	}
+
+	var ack models.TradeAck
+	if err := json.Unmarshal(msg.Data, &ack); err != nil {
+		fmt.Println("ERROR UNMARSHALING ACK IN updateTradeStatusToParticipant")
+		return
+	}
 }
 
 func (engine *Engine) handleCancelOrder(msg *nats.Msg) {

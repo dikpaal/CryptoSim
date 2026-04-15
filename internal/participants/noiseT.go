@@ -4,11 +4,12 @@ import (
 	"cryptosim/internal/models"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/nats-io/nats.go"
 	"math/rand"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 )
 
 type NoiseTrader struct {
@@ -39,6 +40,12 @@ func (noiseT *NoiseTrader) Start() error {
 	if err != nil {
 		return fmt.Errorf("subscribe %s: %w", topic, err)
 	}
+
+	_, err3 := noiseT.ParticipantConfig.NC.nc.Subscribe(string(models.NoiseTradeExecutedTopic), noiseT.handleTradeReqReply)
+	if err3 != nil {
+		return fmt.Errorf("subscribe trade executed req reply: %w", err3)
+	}
+
 	go noiseT.run()
 	return nil
 }
@@ -103,6 +110,30 @@ func (noiseT *NoiseTrader) run() {
 }
 
 // -- NATS request-reply --
+
+func (noiseT *NoiseTrader) handleTradeReqReply(msg *nats.Msg) {
+	var trade models.Trade
+	err := json.Unmarshal(msg.Data, &trade)
+	if err != nil {
+		noiseT.replyError(msg, "invalid trade payload")
+		return
+	}
+
+	ack := models.TradeAck{
+		TradeID: trade.TradeID,
+	}
+
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
+
+func (noiseT *NoiseTrader) replyError(msg *nats.Msg, reason string) {
+	ack := models.TradeAck{
+		Reason: reason,
+	}
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
 
 func (noiseT *NoiseTrader) submitOrder(side models.Side, orderType models.OrderType, price float64, quantity float64) string {
 	order := models.Order{

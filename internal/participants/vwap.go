@@ -4,10 +4,11 @@ import (
 	"cryptosim/internal/models"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/nats-io/nats.go"
 	"sync"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/nats-io/nats.go"
 )
 
 type VWAPTrader struct {
@@ -44,6 +45,12 @@ func (t *VWAPTrader) Start() error {
 	if err2 != nil {
 		return fmt.Errorf("subscribe trades.executed: %w", err2)
 	}
+
+	_, err3 := t.ParticipantConfig.NC.nc.Subscribe(string(models.VWAPTradeExecutedTopic), t.handleTradeReqReply)
+	if err3 != nil {
+		return fmt.Errorf("subscribe trade executed req reply: %w", err3)
+	}
+
 	return nil
 }
 
@@ -112,6 +119,30 @@ func (t *VWAPTrader) handlePriceInflux(msg *nats.Msg) {
 	t.mu.Lock()
 	t.ActiveOrderID = newOrderID
 	t.mu.Unlock()
+}
+
+func (t *VWAPTrader) handleTradeReqReply(msg *nats.Msg) {
+	var trade models.Trade
+	err := json.Unmarshal(msg.Data, &trade)
+	if err != nil {
+		t.replyError(msg, "invalid trade payload")
+		return
+	}
+
+	ack := models.TradeAck{
+		TradeID: trade.TradeID,
+	}
+
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
+}
+
+func (t *VWAPTrader) replyError(msg *nats.Msg, reason string) {
+	ack := models.TradeAck{
+		Reason: reason,
+	}
+	data, _ := json.Marshal(ack)
+	msg.Respond(data)
 }
 
 func (t *VWAPTrader) submitOrder(side models.Side, orderType models.OrderType, price float64, quantity float64) string {

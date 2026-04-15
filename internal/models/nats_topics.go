@@ -28,6 +28,14 @@ const (
 	MetricsDBTopic         = "metrics.db"
 )
 
+type IndividualTradeTopic string
+
 const (
-	TradeExecutedReqReplytopic = "trades.executedreqreply"
+	ScalperTradeExecutedTopic        IndividualTradeTopic = "mm1.tradeexecuted"
+	MomentumTradeExecutedTopic       IndividualTradeTopic = "mm2.tradeexecuted"
+	AvstoikovTradeExecutedTopic      IndividualTradeTopic = "mm3.tradeexecuted"
+	MomentumChaserTradeExecutedTopic IndividualTradeTopic = "t1.tradeexecuted"
+	MeanReversionTradeExecutedTopic  IndividualTradeTopic = "t2.tradeexecuted"
+	NoiseTradeExecutedTopic          IndividualTradeTopic = "t3.tradeexecuted"
+	VWAPTradeExecutedTopic           IndividualTradeTopic = "t4.tradeexecuted"
 )
