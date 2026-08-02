@@ -15,6 +15,7 @@ A crypto exchange simulator in Go. Runs a live order matching engine anchored to
 - Docker
 
 ---
+<img width="946" height="686" alt="Screenshot 2026-08-01 at 21 43 56" src="https://github.com/user-attachments/assets/1079c0b7-98bc-4cd3-8813-d76760d4cc0a" />
 <img width="1070" height="930" alt="Screenshot 2026-04-05 at 06 55 20" src="https://github.com/user-attachments/assets/9345a738-d682-471c-877e-7ad0df8e11f3" />
 <img width="1066" height="925" alt="Screenshot 2026-04-05 at 06 55 45" src="https://github.com/user-attachments/assets/83b3311e-22c2-4a29-adb9-463b8d4257c7" />
 <img width="1067" height="926" alt="Screenshot 2026-04-05 at 06 56 10" src="https://github.com/user-attachments/assets/a92bf841-2283-40c2-bf6f-fb745ddf32a7" />
